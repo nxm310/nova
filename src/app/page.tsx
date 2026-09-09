@@ -79,6 +79,15 @@ export default function CompanionApp() {
 
     // Initialiser les voix synthèse Web Speech
     audioManager.getWebSpeechVoices();
+
+    // Synchronisation automatique avec le fichier persistant du PC (%APPDATA%/Nova/nova_config.json)
+    storage.syncWithBridge().then((res) => {
+      if (res.synced && res.config) {
+        if (res.config.profile) setProfile(res.config.profile);
+        if (res.config.memories) setMemories(res.config.memories);
+        console.log('✓ Configuration restaurée depuis le fichier persistant du PC');
+      }
+    });
   }, []);
 
   // Défilement automatique vers le bas lors de nouveaux messages

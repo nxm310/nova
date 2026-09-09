@@ -289,6 +289,58 @@ def press_key(key_name: str):
         print(f"   ✓ [{combo_str}] simulation console.")
 
 
+def get_persistent_config_path() -> str:
+    """Renvoie le chemin du fichier de configuration persistant utilisateur.
+    Sur Windows : %APPDATA%\\Nova\\nova_config.json (conserve tous les réglages lors des mises à jour du .exe).
+    Sur macOS : ~/Library/Application Support/Nova/nova_config.json
+    Sur Linux : ~/.config/nova/nova_config.json
+    """
+    if sys.platform == "win32":
+        appdata = os.getenv("APPDATA") or os.path.expanduser("~\\AppData\\Roaming")
+        folder = os.path.join(appdata, "Nova")
+    elif sys.platform == "darwin":
+        folder = os.path.expanduser("~/Library/Application Support/Nova")
+    else:
+        folder = os.path.expanduser("~/.config/nova")
+
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except Exception:
+        folder = BASE_DIR
+
+    return os.path.join(folder, "nova_config.json")
+
+def load_persistent_config() -> dict:
+    config_path = get_persistent_config_path()
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[CONFIG] Erreur lecture {config_path}: {e}")
+
+    # Fallback : vérifier s'il existe un nova_config.json local
+    local_cfg = os.path.join(BASE_DIR, "nova_config.json")
+    if os.path.exists(local_cfg):
+        try:
+            with open(local_cfg, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+
+    return {}
+
+def save_persistent_config(data: dict) -> bool:
+    config_path = get_persistent_config_path()
+    try:
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"💾 [CONFIG] Configuration utilisateur persistée : {config_path}")
+        return True
+    except Exception as e:
+        print(f"[CONFIG] Erreur écriture {config_path}: {e}")
+        return False
+
 class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=OUT_DIR, **kwargs)
@@ -329,9 +381,19 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                 "name": "Nova Star Citizen Unified Companion",
                 "directInput": has_directinput or is_windows,
                 "isAdmin": is_admin_windows(),
+                "configPath": get_persistent_config_path(),
                 "platform": sys.platform,
             }
             self.wfile.write(json.dumps(info).encode("utf-8"))
+            return
+
+        if clean in ('/config', '/nova/config'):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            cfg = load_persistent_config()
+            self.wfile.write(json.dumps(cfg).encode("utf-8"))
             return
 
         if clean in ('', '/'):
@@ -361,6 +423,22 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"[ERREUR] {e}")
 
+        if clean in ('/config', '/nova/config'):
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body.decode("utf-8"))
+                if isinstance(data, dict):
+                    ok = save_persistent_config(data)
+                    self.send_response(200 if ok else 500)
+                    self.send_header("Content-Type", "application/json")
+                    self._send_cors()
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": ok, "path": get_persistent_config_path()}).encode("utf-8"))
+                    return
+            except Exception as e:
+                print(f"[CONFIG ERREUR] {e}")
+
         self.send_response(400)
         self._send_cors()
         self.end_headers()
@@ -388,6 +466,7 @@ def run():
     print(f"  ✓ Application & Pont clavier disponibles sur : http://localhost:{PORT}/nova/")
     print(f"  ✓ Ouverture automatique de votre navigateur...")
     print(f"  ✓ Commandes Star Citizen (U, R, N, ALT+N, B, L, P, C, K, etc.)")
+    print(f"  ✓ Configurations conservées dans : {get_persistent_config_path()}")
     if is_windows:
         if admin_ok:
             print("  ✓ Privilèges Administrateur : ACTIFS (Star Citizen peut recevoir les touches)")

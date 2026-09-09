@@ -33,6 +33,9 @@ import {
   Radio,
   Edit2,
   RotateCcw,
+  HardDrive,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { macroManager, VoiceMacro, DEFAULT_VOICE_MACROS } from '@/lib/voiceMacros';
 
@@ -46,7 +49,7 @@ interface SettingsModalProps {
   onClearHistory: () => void;
 }
 
-type TabType = 'character' | 'voice' | 'memory' | 'api' | 'macros';
+type TabType = 'character' | 'voice' | 'memory' | 'api' | 'macros' | 'backup';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -85,6 +88,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [editMacroPhrases, setEditMacroPhrases] = useState<string>('');
   const [editMacroReply, setEditMacroReply] = useState<string>('');
   const [testKeyFeedbackId, setTestKeyFeedbackId] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -95,6 +100,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setBridgeUrl(macroManager.getBridgeUrl());
       setBridgeStatus(null);
       setEditingMacroId(null);
+      setSyncStatus(null);
     }
   }, [isOpen, profile]);
 
@@ -105,8 +111,70 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     macroManager.saveMacros(macros);
     macroManager.setBridgeUrl(bridgeUrl);
     onSaveProfile(formData);
+    storage.pushToBridge(bridgeUrl);
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 2000);
+  };
+
+  const handleExportBackup = () => {
+    const config = storage.exportFullConfig();
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(config, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `nova_config_backup_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        const ok = storage.importFullConfig(json);
+        if (ok) {
+          const newProf = storage.getProfile();
+          setFormData(newProf);
+          setApiKey(storage.getApiKey());
+          setMacros(macroManager.getMacros());
+          setBridgeUrl(macroManager.getBridgeUrl());
+          onSaveProfile(newProf);
+          storage.pushToBridge(macroManager.getBridgeUrl());
+          alert('✓ Configuration importée et synchronisée avec succès !');
+        } else {
+          alert('Format de fichier invalide.');
+        }
+      } catch (err) {
+        alert('Impossible de lire le fichier JSON de configuration.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleManualSyncBridge = async () => {
+    setIsSyncing(true);
+    setSyncStatus(null);
+    try {
+      await storage.pushToBridge(bridgeUrl);
+      const res = await storage.syncWithBridge(bridgeUrl);
+      if (res.config) {
+        const newProf = storage.getProfile();
+        setFormData(newProf);
+        setApiKey(storage.getApiKey());
+        setMacros(macroManager.getMacros());
+        setBridgeUrl(macroManager.getBridgeUrl());
+        onSaveProfile(newProf);
+      }
+      setSyncStatus('Fichier persistant synchronisé sur votre PC !');
+    } catch {
+      setSyncStatus('Erreur lors de la synchronisation.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleTestBridge = async () => {
@@ -181,6 +249,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     setMacros(updated);
     macroManager.saveMacros(updated);
+    storage.pushToBridge(bridgeUrl);
     setEditingMacroId(null);
   };
 
@@ -214,6 +283,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const updated = [...macros, newM];
     setMacros(updated);
     macroManager.saveMacros(updated);
+    storage.pushToBridge(bridgeUrl);
 
     setNewMacroName('');
     setNewMacroKey('');
@@ -226,18 +296,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const updated = macros.filter((m) => m.id !== id);
     setMacros(updated);
     macroManager.saveMacros(updated);
+    storage.pushToBridge(bridgeUrl);
   };
 
   const handleToggleMacro = (id: string) => {
     const updated = macros.map((m) => (m.id === id ? { ...m, enabled: !m.enabled } : m));
     setMacros(updated);
     macroManager.saveMacros(updated);
+    storage.pushToBridge(bridgeUrl);
   };
 
   const handleResetDefaultMacros = () => {
     if (confirm('Rétablir les macros par défaut de Star Citizen (Train N, Atterrissage ALT+N, VTOL ALT+J, Power U, etc.) ?')) {
       setMacros(DEFAULT_VOICE_MACROS);
       macroManager.saveMacros(DEFAULT_VOICE_MACROS);
+      storage.pushToBridge(bridgeUrl);
       setEditingMacroId(null);
     }
   };
@@ -412,6 +485,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Gamepad2 className="w-4 h-4 text-cyan-400" />
             Touches Star Citizen ({macros.filter((m) => m.enabled).length})
+          </button>
+          <button
+            onClick={() => setActiveTab('backup')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+              activeTab === 'backup'
+                ? 'border-accent-500 text-purple-400 bg-slate-800/40'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <HardDrive className="w-4 h-4 text-purple-400" />
+            Sauvegarde & Mises à jour
           </button>
         </div>
 
@@ -1360,6 +1444,82 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Ajouter cette commande vocale
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* TAB 6: SAUVEGARDE & MISES À JOUR */}
+          {activeTab === 'backup' && (
+            <div className="space-y-5 animate-fade-in text-slate-200">
+              {/* Explication persistance */}
+              <div className="p-4 bg-slate-950/80 border border-purple-500/30 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-purple-400" />
+                  <h3 className="font-semibold text-sm text-white">
+                    Persistance Permanente des Données
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Toutes vos configurations (touches modifiées, commandes vocales Star Citizen, profil du compagnon, clé API Gemini et mémoires) sont automatiquement conservées sur votre PC dans :
+                </p>
+                <code className="block font-mono text-[11px] text-purple-300 bg-black/50 p-2.5 rounded-xl border border-purple-500/20">
+                  %APPDATA%\Nova\nova_config.json
+                </code>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  💡 <strong className="text-white">Mises à jour sans perte :</strong> Même si vous remplacez le dossier de l&apos;application pour installer un nouvel exécutable (<span className="font-mono text-cyan-300">Nova-StarCitizen.exe</span>), vos réglages restent intacts sur votre ordinateur et sont automatiquement restaurés dès l&apos;ouverture !
+                </p>
+
+                <div className="pt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleManualSyncBridge}
+                    disabled={isSyncing}
+                    className="px-3.5 py-2 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 rounded-xl text-xs font-semibold text-purple-200 transition flex items-center gap-1.5"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Synchronisation...' : 'Synchroniser maintenant avec le PC'}
+                  </button>
+                  {syncStatus && (
+                    <span className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> {syncStatus}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Export et Import manuel */}
+              <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-4">
+                <div>
+                  <h4 className="font-semibold text-xs text-white flex items-center gap-1.5 mb-1">
+                    <Download className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Sauvegarde Manuelle (Fichier JSON)</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Vous pouvez également exporter un fichier de sauvegarde à tout moment pour l&apos;archiver ou le transférer sur un autre PC de jeu.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleExportBackup}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-cyan-300 transition flex items-center gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Télécharger la sauvegarde (.json)
+                  </button>
+
+                  <label className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 transition flex items-center gap-2 cursor-pointer">
+                    <Upload className="w-3.5 h-3.5 text-purple-300" />
+                    <span>Restaurer depuis un fichier (.json)</span>
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleImportBackup}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           )}
         </div>

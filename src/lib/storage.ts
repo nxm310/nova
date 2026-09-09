@@ -1,5 +1,6 @@
 import { CompanionProfile, ChatMessage, MemoryItem } from '@/types/companion';
 import { DEFAULT_PROFILE } from './constants';
+import { VoiceMacro, macroManager, DEFAULT_VOICE_MACROS } from './voiceMacros';
 
 const KEYS = {
   PROFILE: 'ami_profile_v1',
@@ -8,6 +9,16 @@ const KEYS = {
   MEMORIES: 'ami_memories_v1',
 };
 
+export interface FullNovaConfig {
+  version: number;
+  profile: CompanionProfile;
+  apiKey: string;
+  memories: MemoryItem[];
+  macros: VoiceMacro[];
+  bridgeUrl: string;
+  savedAt: number;
+}
+
 export const storage = {
   getProfile(): CompanionProfile {
     if (typeof window === 'undefined') return DEFAULT_PROFILE;
@@ -15,7 +26,6 @@ export const storage = {
       const data = localStorage.getItem(KEYS.PROFILE);
       if (!data) return DEFAULT_PROFILE;
       const parsed = JSON.parse(data);
-      // Si l'utilisateur avait l'ancienne vitesse par défaut (1.0x ou moins), on le passe au nouveau standard plus rapide et fluide (1.25x)
       if (!parsed.speechRate || parsed.speechRate <= 1.0) {
         parsed.speechRate = 1.25;
         localStorage.setItem(KEYS.PROFILE, JSON.stringify({ ...DEFAULT_PROFILE, ...parsed }));
@@ -53,7 +63,6 @@ export const storage = {
 
   saveMessages(messages: ChatMessage[]): void {
     if (typeof window === 'undefined') return;
-    // Garder les 100 derniers messages pour éviter de saturer le localStorage
     const truncated = messages.slice(-100);
     localStorage.setItem(KEYS.MESSAGES, JSON.stringify(truncated));
   },
@@ -92,5 +101,105 @@ export const storage = {
   deleteMemory(id: string): void {
     const memories = storage.getMemories().filter((m) => m.id !== id);
     storage.saveMemories(memories);
+  },
+
+  exportFullConfig(): FullNovaConfig {
+    return {
+      version: 1,
+      profile: this.getProfile(),
+      apiKey: this.getApiKey(),
+      memories: this.getMemories(),
+      macros: macroManager.getMacros(),
+      bridgeUrl: macroManager.getBridgeUrl(),
+      savedAt: Date.now(),
+    };
+  },
+
+  importFullConfig(config: Partial<FullNovaConfig>): boolean {
+    if (!config || typeof config !== 'object') return false;
+    try {
+      if (config.profile) {
+        this.saveProfile({ ...DEFAULT_PROFILE, ...config.profile });
+      }
+      if (config.apiKey !== undefined) {
+        this.saveApiKey(config.apiKey);
+      }
+      if (Array.isArray(config.memories)) {
+        this.saveMemories(config.memories);
+      }
+      if (Array.isArray(config.macros) && config.macros.length > 0) {
+        macroManager.saveMacros(config.macros);
+      }
+      if (config.bridgeUrl) {
+        macroManager.setBridgeUrl(config.bridgeUrl);
+      }
+      return true;
+    } catch (e) {
+      console.error('Erreur importation config:', e);
+      return false;
+    }
+  },
+
+  async pushToBridge(customBridgeUrl?: string): Promise<boolean> {
+    const primaryUrl = customBridgeUrl || macroManager.getBridgeUrl();
+    const candidateUrls = [primaryUrl];
+    if (!candidateUrls.includes('http://localhost:5005')) {
+      candidateUrls.push('http://localhost:5005');
+    }
+
+    const payload = this.exportFullConfig();
+
+    for (const url of candidateUrls) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(`${url}/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          return true;
+        }
+      } catch {
+        // Essayer candidate suivante
+      }
+    }
+    return false;
+  },
+
+  async syncWithBridge(customBridgeUrl?: string): Promise<{ synced: boolean; config?: FullNovaConfig }> {
+    const primaryUrl = customBridgeUrl || macroManager.getBridgeUrl();
+    const candidateUrls = [primaryUrl];
+    if (!candidateUrls.includes('http://localhost:5005')) {
+      candidateUrls.push('http://localhost:5005');
+    }
+
+    for (const url of candidateUrls) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(`${url}/config`, { signal: controller.signal });
+        clearTimeout(timeout);
+
+        if (res.ok) {
+          const remote = await res.json();
+          // Si le fichier sur le PC contient déjà des configurations
+          if (remote && (remote.profile || remote.macros || remote.apiKey || remote.memories)) {
+            this.importFullConfig(remote);
+            return { synced: true, config: remote };
+          } else {
+            // Premier lancement : le fichier sur le PC est vierge, on envoie notre configuration initiale
+            await this.pushToBridge(url);
+            return { synced: false };
+          }
+        }
+      } catch {
+        // Essayer candidate suivante
+      }
+    }
+    return { synced: false };
   },
 };
