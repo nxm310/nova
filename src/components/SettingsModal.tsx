@@ -893,13 +893,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Permet à Ami de presser directement des touches physiques dans Star Citizen avec 0ms de latence dès que vous prononcez l&apos;ordre à la voix.
                 </p>
 
-                <div className="flex items-center gap-2 pt-1">
+                {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
+                  <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-xs text-amber-200 space-y-1.5">
+                    <div className="font-semibold flex items-center gap-1.5 text-amber-300">
+                      <span>⚠️ Navigation HTTPS détectée (github.io)</span>
+                    </div>
+                    <p className="leading-relaxed text-[11px] text-amber-200/90">
+                      Les navigateurs interdisent à un site web distant sécurisé (HTTPS) de joindre directement votre PC en HTTP local (règle de sécurité Mixed Content).
+                    </p>
+                    <p className="leading-relaxed text-[11px] font-medium text-white">
+                      👉 Pour que les touches fonctionnent dans votre jeu, ouvrez l&apos;application sur votre réseau local :{' '}
+                      <span className="font-mono text-cyan-300">http://192.168.50.174:3000</span> (ou <span className="font-mono text-cyan-300">http://localhost:3000</span> sur le PC).
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <input
                     type="text"
                     value={bridgeUrl}
                     onChange={(e) => setBridgeUrl(e.target.value)}
                     placeholder="http://192.168.50.34:5005 ou http://localhost:5005"
-                    className="flex-1 bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
+                    className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
                   />
                   <button
                     type="button"
@@ -907,7 +922,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     disabled={bridgeTesting}
                     className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-cyan-300 transition shrink-0 flex items-center gap-1.5"
                   >
-                    {bridgeTesting ? 'Test...' : 'Tester le pont'}
+                    {bridgeTesting ? 'Test...' : 'Tester connexion'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const res = await macroManager.sendKeyToBridge('u');
+                      if (res.success) {
+                        alert("✓ Touche 'U' (Démarrage vaisseau) envoyée avec succès au pont PC !");
+                      } else {
+                        alert("❌ Échec : le pont clavier n'a pas répondu. Vérifiez que LANCER_PONT_PC.bat tourne sur le PC.");
+                      }
+                    }}
+                    className="px-3 py-2 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 rounded-xl text-xs font-semibold text-cyan-300 transition shrink-0"
+                    title="Envoie un appui sur la touche U pour tester le démarrage du vaisseau"
+                  >
+                    Tester touche [U]
                   </button>
                 </div>
 
