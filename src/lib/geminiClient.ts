@@ -124,4 +124,144 @@ ${memoriesText}
 
     return reply;
   },
+
+  async generateSpeech({
+    text,
+    voice = 'Puck',
+    apiKey,
+  }: {
+    text: string;
+    voice?: string;
+    apiKey: string;
+  }): Promise<string> {
+    const key = (apiKey || '').trim();
+    if (!key) {
+      throw new Error(
+        "Clé API Gemini manquante. Renseigne ta clé API dans l'onglet 'Clé API' des Paramètres ⚙️."
+      );
+    }
+
+    const candidateModels = ['gemini-2.0-flash', 'gemini-2.5-flash'];
+    let lastError: Error | null = null;
+
+    for (const model of candidateModels) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const payload = {
+        contents: [
+          {
+            parts: [
+              {
+                text: `Prononce exactement la phrase suivante en français, sans aucun préambule ni commentaire : "${text.replace(/"/g, "'")}"`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voice || 'Puck',
+              },
+            },
+          },
+        },
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData?.error?.message ||
+              `Erreur Gemini Audio (${response.status}: ${response.statusText})`
+          );
+        }
+
+        const data = await response.json();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const audioPart = parts.find((p: any) => p.inlineData || p.inline_data);
+        const inline = audioPart?.inlineData || audioPart?.inline_data;
+
+        if (!inline || !inline.data) {
+          throw new Error("L'API Gemini n'a pas renvoyé de piste audio dans la réponse.");
+        }
+
+        const mimeType = inline.mimeType || inline.mime_type || 'audio/wav';
+        const base64Audio = inline.data;
+
+        const binaryString = window.atob(base64Audio);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const isAlreadyWav =
+          bytes.length >= 4 &&
+          bytes[0] === 0x52 &&
+          bytes[1] === 0x49 &&
+          bytes[2] === 0x46 &&
+          bytes[3] === 0x46; // 'RIFF'
+
+        let blob: Blob;
+        if (isAlreadyWav) {
+          blob = new Blob([bytes], { type: 'audio/wav' });
+        } else {
+          let rate = 24000;
+          const match = (mimeType || '').match(/rate=(\d+)/);
+          if (match) rate = parseInt(match[1], 10);
+          blob = pcmToWavBlob(bytes, rate);
+        }
+
+        return URL.createObjectURL(blob);
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Tentative synthèse Gemini audio (${model}) échouée :`, err.message);
+      }
+    }
+
+    throw lastError || new Error("Impossible de générer l'audio avec Gemini.");
+  },
 };
+
+function writeString(view: DataView, offset: number, string: string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function pcmToWavBlob(pcmData: Uint8Array, sampleRate = 24000, numChannels = 1): Blob {
+  const byteRate = sampleRate * numChannels * 2;
+  const blockAlign = numChannels * 2;
+  const buffer = new ArrayBuffer(44 + pcmData.length);
+  const view = new DataView(buffer);
+
+  // "RIFF" chunk descriptor
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + pcmData.length, true);
+  writeString(view, 8, 'WAVE');
+
+  // "fmt " sub-chunk
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM = 1
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true); // 16-bit
+
+  // "data" sub-chunk
+  writeString(view, 36, 'data');
+  view.setUint32(40, pcmData.length, true);
+
+  new Uint8Array(buffer, 44).set(pcmData);
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}

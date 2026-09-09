@@ -38,6 +38,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { macroManager, VoiceMacro, DEFAULT_VOICE_MACROS } from '@/lib/voiceMacros';
+import { geminiClient } from '@/lib/geminiClient';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -356,9 +357,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           { robotEffect: formData.robotEffect }
         );
       } catch (err) {
-        console.error(err);
-        setIsPlayingTest(false);
-        alert('Impossible de jouer la voix Edge-TTS.');
+        console.warn('Synthèse Edge non disponible en local, bascule Web Speech:', err);
+        audioManager.speakWebSpeech(testText, {
+          rate: formData.speechRate,
+          pitch: formData.robotEffect ? 1.35 : 1.0,
+          onEnd: () => setIsPlayingTest(false),
+          onError: () => setIsPlayingTest(false),
+        });
       }
     } else if (formData.voiceProvider === 'gemini') {
       const currentKey = apiKey || storage.getApiKey();
@@ -368,23 +373,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         return;
       }
       try {
-        const res = await fetch('/api/tts/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: testText,
-            voice: formData.geminiVoice,
-            apiKey: currentKey,
-          }),
+        const audioUrl = await geminiClient.generateSpeech({
+          text: testText,
+          voice: formData.geminiVoice,
+          apiKey: currentKey,
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Erreur Gemini Audio');
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
         audioManager.playAudioStream(
-          url,
+          audioUrl,
           () => setIsPlayingTest(true),
           () => setIsPlayingTest(false),
           () => setIsPlayingTest(false),

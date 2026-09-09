@@ -238,7 +238,7 @@ export default function CompanionApp() {
       return;
     }
 
-    // 3. Gemini Audio Natif
+    // 3. Gemini Audio Natif (Direct Google API)
     if (profile.voiceProvider === 'gemini') {
       const apiKey = storage.getApiKey();
       if (!apiKey) {
@@ -246,23 +246,16 @@ export default function CompanionApp() {
         return;
       }
       try {
-        const res = await fetch('/api/tts/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: cleanText,
-            voice: profile.geminiVoice,
-            apiKey,
-          }),
+        const audioUrl = await geminiClient.generateSpeech({
+          text: cleanText,
+          voice: profile.geminiVoice,
+          apiKey,
         });
-        if (!res.ok) throw new Error('Erreur synthèse Gemini');
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        audioManager.playAudioStream(url, undefined, onEnd, onError, {
+        audioManager.playAudioStream(audioUrl, undefined, onEnd, onError, {
           robotEffect: profile.robotEffect,
         });
       } catch (err) {
-        console.warn('Fallback Gemini TTS vers Edge-TTS:', err);
+        console.warn('Fallback Gemini TTS vers Web Speech:', err);
         audioManager.speakWebSpeech(cleanText, { rate: profile.speechRate, onEnd, onError });
       }
     }
