@@ -34,6 +34,8 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Save,
+  FolderOpen,
 } from 'lucide-react';
 
 export default function CompanionApp() {
@@ -88,6 +90,65 @@ export default function CompanionApp() {
         console.log('✓ Configuration restaurée depuis le fichier persistant du PC');
       }
     });
+  }, []);
+
+  // --- Sauvegarde & Restauration Rapide en 1 Clic ---
+  const [quickSaveToast, setQuickSaveToast] = useState(false);
+
+  const handleQuickSave = () => {
+    const config = storage.exportFullConfig();
+    const dataStr =
+      'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(config, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `nova_sauvegarde_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    // Envoi également vers le fichier persistant du PC
+    storage.pushToBridge();
+
+    setQuickSaveToast(true);
+    setTimeout(() => setQuickSaveToast(false), 3000);
+  };
+
+  const handleQuickRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        const ok = storage.importFullConfig(json);
+        if (ok) {
+          const newProf = storage.getProfile();
+          setProfile(newProf);
+          setMemories(storage.getMemories());
+          storage.pushToBridge();
+          alert('✓ Réglages restaurés avec succès ! Vos touches et configurations sont en place.');
+        } else {
+          alert('Format de fichier invalide.');
+        }
+      } catch (err) {
+        alert('Impossible de lire le fichier de sauvegarde JSON.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Raccourci clavier universel Ctrl+S pour sauvegarder en 1 seconde
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleQuickSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Défilement automatique vers le bas lors de nouveaux messages
@@ -654,6 +715,31 @@ export default function CompanionApp() {
             <Trash2 className="w-4 h-4" />
           </button>
 
+          {/* Touche Sauvegarde Rapide */}
+          <button
+            onClick={handleQuickSave}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/35 border border-purple-500/40 text-purple-200 text-xs font-semibold shadow-sm active:scale-95 transition"
+            title="Sauvegarder mes réglages (touches, profil, clé API) pour pouvoir les restaurer à chaque réinstallation (Raccourci: Ctrl+S)"
+          >
+            <Save className="w-3.5 h-3.5 text-purple-300" />
+            <span className="hidden md:inline">Sauvegarder</span>
+          </button>
+
+          {/* Touche Restauration Rapide */}
+          <label
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/35 border border-cyan-500/40 text-cyan-200 text-xs font-semibold shadow-sm active:scale-95 transition cursor-pointer"
+            title="Restaurer mes réglages depuis une sauvegarde (.json)"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-cyan-300" />
+            <span className="hidden md:inline">Restaurer</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={handleQuickRestore}
+              className="hidden"
+            />
+          </label>
+
           {/* Bouton Paramètres */}
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -664,6 +750,14 @@ export default function CompanionApp() {
           </button>
         </div>
       </header>
+
+      {/* Toast de confirmation de sauvegarde */}
+      {quickSaveToast && (
+        <div className="fixed top-20 right-5 z-50 animate-fade-in bg-purple-950/95 text-purple-100 border border-purple-500 px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 backdrop-blur-md">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>✓ Réglages sauvegardés dans votre dossier Téléchargements !</span>
+        </div>
+      )}
 
       {/* ZONE DE CHAT SCROLLABLE */}
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
