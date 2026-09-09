@@ -231,11 +231,12 @@ def to_pydirectinput_key(k: str) -> str:
     }
     return mapping.get(k, k)
 
-def press_key(key_name: str):
+def press_key(key_name: str, duration: float = 0.18):
     mods, main_key = parse_key_combo(key_name)
     combo_str = '+'.join(mods + [main_key]).upper()
+    duration_label = f" (APPUI LONG {duration:.1f}s)" if duration >= 0.5 else f" (APPUI COURT {duration:.2f}s)"
     heure = time.strftime("%H:%M:%S")
-    print(f"🎮 [{heure}] ORDRE VOCAL ➔ Combinaison : [{combo_str}]")
+    print(f"🎮 [{heure}] ORDRE VOCAL ➔ Combinaison : [{combo_str}]{duration_label}")
 
     # Tenter d'assurer le focus sur Star Citizen
     ensure_star_citizen_focus()
@@ -256,8 +257,8 @@ def press_key(key_name: str):
                 # 2. Enfoncer la touche principale
                 pydirectinput.keyDown(to_pydirectinput_key(main_key))
 
-                # 3. Maintien de 180ms (essentiel pour la détection frame par frame de Star Citizen)
-                time.sleep(0.18)
+                # 3. Maintien selon durée (ex: 0.18s pour court, 1.5s pour appui long)
+                time.sleep(duration)
 
                 # 4. Relâcher la touche principale
                 pydirectinput.keyUp(to_pydirectinput_key(main_key))
@@ -267,7 +268,7 @@ def press_key(key_name: str):
                 for m in reversed(mods):
                     pydirectinput.keyUp(to_pydirectinput_key(m))
 
-                print(f"   ✓ [{combo_str}] injectée avec succès (PyDirectInput 180ms) !")
+                print(f"   ✓ [{combo_str}] injectée avec succès (PyDirectInput {duration:.2f}s) !")
                 return
             except Exception as ex:
                 print(f"   ℹ Bascule sur DirectInput natif suite à: {ex}")
@@ -278,14 +279,14 @@ def press_key(key_name: str):
         time.sleep(0.02)
 
         send_directinput_native_key(main_key, key_up=False)
-        time.sleep(0.18)
+        time.sleep(duration)
         send_directinput_native_key(main_key, key_up=True)
         time.sleep(0.02)
 
         for m in reversed(mods):
             send_directinput_native_key(m, key_up=True)
 
-        print(f"   ✓ [{combo_str}] injectée avec succès (DirectInput Natif Windows 180ms) !")
+        print(f"   ✓ [{combo_str}] injectée avec succès (DirectInput Natif Windows {duration:.2f}s) !")
 
     elif has_pyautogui:
         import pyautogui
@@ -293,12 +294,12 @@ def press_key(key_name: str):
             pyautogui.keyDown(m)
         time.sleep(0.02)
         pyautogui.keyDown(main_key)
-        time.sleep(0.18)
+        time.sleep(duration)
         pyautogui.keyUp(main_key)
         time.sleep(0.02)
         for m in reversed(mods):
             pyautogui.keyUp(m)
-        print(f"   ✓ [{combo_str}] envoyée via PyAutoGUI.")
+        print(f"   ✓ [{combo_str}] envoyée via PyAutoGUI ({duration:.2f}s).")
 
     elif sys.platform == "darwin":
         import os
@@ -310,10 +311,13 @@ def press_key(key_name: str):
             using_clause = "using {control down}"
         elif 'shift' in mods or 'lshift' in mods:
             using_clause = "using {shift down}"
-        os.system(f"""osascript -e 'tell application "System Events" to keystroke "{main_key}" {using_clause}' 2>/dev/null || true""")
-        print(f"   ✓ [{combo_str}] simulée sur macOS.")
+        if duration >= 0.5:
+            os.system(f"""osascript -e 'tell application "System Events" to key down "{main_key}"' -e 'delay {duration}' -e 'tell application "System Events" to key up "{main_key}"' 2>/dev/null || true""")
+        else:
+            os.system(f"""osascript -e 'tell application "System Events" to keystroke "{main_key}" {using_clause}' 2>/dev/null || true""")
+        print(f"   ✓ [{combo_str}] simulée sur macOS ({duration:.2f}s).")
     else:
-        print(f"   ✓ [{combo_str}] simulation console.")
+        print(f"   ✓ [{combo_str}] simulation console ({duration:.2f}s).")
 
 
 def get_persistent_config_path() -> str:
@@ -525,13 +529,25 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode("utf-8"))
                 key = data.get("key", "")
+                press_type = data.get("pressType") or data.get("type", "tap")
+                default_dur = 1.5 if press_type in ("hold", "long") else 0.18
+                try:
+                    duration = float(data.get("duration", default_dur))
+                except (ValueError, TypeError):
+                    duration = default_dur
+
                 if key:
-                    press_key(key)
+                    press_key(key, duration=duration)
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self._send_cors()
                     self.end_headers()
-                    self.wfile.write(json.dumps({"success": True, "key": key}).encode("utf-8"))
+                    self.wfile.write(json.dumps({
+                        "success": True,
+                        "key": key,
+                        "pressType": press_type,
+                        "duration": duration
+                    }).encode("utf-8"))
                     return
             except Exception as e:
                 print(f"[ERREUR] {e}")

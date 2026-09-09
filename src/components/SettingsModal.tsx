@@ -36,6 +36,8 @@ import {
   HardDrive,
   Download,
   Upload,
+  Zap,
+  Clock,
 } from 'lucide-react';
 import { macroManager, VoiceMacro, DEFAULT_VOICE_MACROS } from '@/lib/voiceMacros';
 import { geminiClient } from '@/lib/geminiClient';
@@ -69,8 +71,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isPlayingTest, setIsPlayingTest] = useState<boolean>(false);
   const [newMemoryInput, setNewMemoryInput] = useState<string>('');
   const [saveToast, setSaveToast] = useState<boolean>(false);
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
+  const [isTestingGeminiVoice, setIsTestingGeminiVoice] = useState(false);
 
-  // Macros & Pont Clavier
+  // Macros Vocales Star Citizen
   const [macros, setMacros] = useState<VoiceMacro[]>([]);
   const [bridgeUrl, setBridgeUrl] = useState<string>('');
   const [bridgeTesting, setBridgeTesting] = useState<boolean>(false);
@@ -79,13 +83,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Formulaire nouvelle macro
   const [newMacroName, setNewMacroName] = useState('');
   const [newMacroKey, setNewMacroKey] = useState('');
+  const [newMacroPressType, setNewMacroPressType] = useState<'tap' | 'hold'>('tap');
+  const [newMacroDuration, setNewMacroDuration] = useState<number>(1.5);
   const [newMacroPhrases, setNewMacroPhrases] = useState('');
   const [newMacroReply, setNewMacroReply] = useState('');
 
   // Édition en place d'une macro existante (intégrée ou personnalisée)
   const [editingMacroId, setEditingMacroId] = useState<string | null>(null);
-  const [editMacroName, setEditMacroName] = useState<string>('');
-  const [editMacroKey, setEditMacroKey] = useState<string>('');
+  const [editMacroName, setEditMacroName] = useState('');
+  const [editMacroKey, setEditMacroKey] = useState('');
+  const [editMacroPressType, setEditMacroPressType] = useState<'tap' | 'hold'>('tap');
+  const [editMacroDuration, setEditMacroDuration] = useState<number>(1.5);
   const [editMacroPhrases, setEditMacroPhrases] = useState<string>('');
   const [editMacroReply, setEditMacroReply] = useState<string>('');
   const [testKeyFeedbackId, setTestKeyFeedbackId] = useState<string | null>(null);
@@ -218,10 +226,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const setFunctionKey = (target: 'new' | 'edit', fKey: string) => {
+    const cur = (target === 'new' ? newMacroKey : editMacroKey).trim().toLowerCase();
+    const mods: string[] = [];
+    if (cur.includes('alt')) mods.push('alt');
+    if (cur.includes('ctrl')) mods.push('ctrl');
+    if (cur.includes('shift')) mods.push('shift');
+    const combo = mods.length > 0 ? `${mods.join('+')}+${fKey.toLowerCase()}` : fKey.toLowerCase();
+    if (target === 'new') setNewMacroKey(combo);
+    else setEditMacroKey(combo);
+  };
+
+  const handleKeyInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    target: 'new' | 'edit'
+  ) => {
+    // Intercepter F1 à F12 pour empêcher le navigateur d'ouvrir l'aide, de rafraîchir ou d'ouvrir les DevTools
+    if (/^f([1-9]|1[0-2])$/i.test(e.key)) {
+      e.preventDefault();
+      e.stopPropagation();
+      const fKey = e.key.toLowerCase();
+      const mods: string[] = [];
+      if (e.altKey) mods.push('alt');
+      if (e.ctrlKey) mods.push('ctrl');
+      if (e.shiftKey) mods.push('shift');
+      const combo = mods.length > 0 ? `${mods.join('+')}+${fKey}` : fKey;
+      if (target === 'new') setNewMacroKey(combo);
+      else setEditMacroKey(combo);
+    }
+  };
+
   const handleStartEditMacro = (m: VoiceMacro) => {
     setEditingMacroId(m.id);
     setEditMacroName(m.name);
     setEditMacroKey(m.key);
+    setEditMacroPressType(m.pressType || 'tap');
+    setEditMacroDuration(m.holdDuration || 1.5);
     setEditMacroPhrases(m.phrases.join(', '));
     setEditMacroReply(m.confirmation);
   };
@@ -245,6 +285,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         ...m,
         name: editMacroName.trim(),
         key: editMacroKey.trim().toLowerCase(),
+        pressType: editMacroPressType,
+        holdDuration: editMacroPressType === 'hold' ? editMacroDuration : undefined,
         phrases: phrases.length > 0 ? phrases : [editMacroName.trim().toLowerCase()],
         confirmation: editMacroReply.trim() || `Commande ${editMacroName.trim()} exécutée.`,
       };
@@ -256,9 +298,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setEditingMacroId(null);
   };
 
-  const handleTestSingleKey = async (macroKey: string, macroId: string) => {
+  const handleTestSingleKey = async (
+    macroKey: string,
+    macroId: string,
+    pressType: 'tap' | 'hold' = 'tap',
+    duration?: number
+  ) => {
     setTestKeyFeedbackId(macroId);
-    const res = await macroManager.sendKeyToBridge(macroKey);
+    const res = await macroManager.sendKeyToBridge(macroKey, pressType, duration);
     setTimeout(() => setTestKeyFeedbackId(null), 1500);
     if (!res.success) {
       alert("Le pont clavier n'a pas répondu. Vérifiez que DEMARRER_NOVA.bat est bien lancé sur votre PC avec les droits Administrateur.");
@@ -278,6 +325,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       id: 'macro_' + Date.now(),
       name: newMacroName.trim(),
       key: newMacroKey.trim().toLowerCase(),
+      pressType: newMacroPressType,
+      holdDuration: newMacroPressType === 'hold' ? newMacroDuration : undefined,
       phrases: phrases.length > 0 ? phrases : [newMacroName.trim().toLowerCase()],
       confirmation: newMacroReply.trim() || `Commande ${newMacroName.trim()} exécutée.`,
       enabled: true,
@@ -290,6 +339,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     setNewMacroName('');
     setNewMacroKey('');
+    setNewMacroPressType('tap');
+    setNewMacroDuration(1.5);
     setNewMacroPhrases('');
     setNewMacroReply('');
   };
@@ -408,7 +459,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4">
       <div className="relative flex flex-col w-full max-w-xl max-h-[90dvh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-slate-100 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
@@ -1178,11 +1229,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   type="text"
                                   value={editMacroKey}
                                   onChange={(e) => setEditMacroKey(e.target.value)}
-                                  placeholder="Ex: alt+n, lalt+j, u, space..."
+                                  onKeyDown={(e) => handleKeyInputKeyDown(e, 'edit')}
+                                  placeholder="Ex: alt+n, lalt+j, u, space, f1..."
                                   maxLength={20}
                                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono uppercase focus:outline-none focus:border-cyan-500"
                                 />
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-wrap items-center gap-1">
                                   <span className="text-[9px] text-slate-500">Ajouter modif. :</span>
                                   <button
                                     type="button"
@@ -1206,7 +1258,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                     + SHIFT
                                   </button>
                                 </div>
+                                {/* Barre d'insertion rapide Touches F1 à F12 */}
+                                <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-slate-800/60">
+                                  <span className="text-[9px] text-slate-500 mr-0.5">Touches F :</span>
+                                  {['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'].map((f) => (
+                                    <button
+                                      key={f}
+                                      type="button"
+                                      onClick={() => setFunctionKey('edit', f)}
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-slate-800 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-slate-700 active:scale-95 transition uppercase"
+                                      title={`Sélectionner la touche ${f.toUpperCase()}`}
+                                    >
+                                      {f}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
+                            </div>
+
+                            {/* Sélecteur Appui Court vs Appui Long */}
+                            <div className="col-span-1 sm:col-span-2 pt-1 border-t border-slate-800/60">
+                              <label className="block text-[10px] text-slate-400 mb-1">
+                                Type d&apos;appui sur la touche
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditMacroPressType('tap')}
+                                  className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                                    editMacroPressType === 'tap'
+                                      ? 'bg-cyan-600/30 border-cyan-500 text-cyan-200 shadow-sm'
+                                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                  }`}
+                                >
+                                  <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>Appui Court (~0.2s)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditMacroPressType('hold')}
+                                  className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                                    editMacroPressType === 'hold'
+                                      ? 'bg-purple-600/30 border-purple-500 text-purple-200 shadow-sm'
+                                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                  }`}
+                                >
+                                  <Clock className="w-3.5 h-3.5 text-purple-400" />
+                                  <span>Appui Long (Maintenu)</span>
+                                </button>
+                              </div>
+
+                              {editMacroPressType === 'hold' && (
+                                <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-purple-950/30 border border-purple-500/30 text-xs">
+                                  <span className="text-[10px] text-purple-300 shrink-0">Durée du maintien :</span>
+                                  {[1.0, 1.5, 2.0, 3.0].map((dur) => (
+                                    <button
+                                      key={dur}
+                                      type="button"
+                                      onClick={() => setEditMacroDuration(dur)}
+                                      className={`px-2 py-0.5 rounded text-[11px] font-mono transition ${
+                                        editMacroDuration === dur
+                                          ? 'bg-purple-600 text-white font-bold'
+                                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                      }`}
+                                    >
+                                      {dur}s
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -1237,11 +1357,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           <div className="flex items-center justify-between pt-1">
                             <button
                               type="button"
-                              onClick={() => handleTestSingleKey(editMacroKey, m.id)}
+                              onClick={() => handleTestSingleKey(editMacroKey, m.id, editMacroPressType, editMacroDuration)}
                               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-[11px] font-medium border border-slate-700 flex items-center gap-1"
                             >
                               <Play className="w-3 h-3" />
-                              Tester [{editMacroKey.toUpperCase() || '?'}]
+                              Tester [{editMacroKey.toUpperCase() || '?'}] {editMacroPressType === 'hold' ? `(${editMacroDuration}s)` : ''}
                             </button>
 
                             <div className="flex gap-2">
@@ -1265,18 +1385,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         /* AFFICHAGE STANDARD AVEC ACTIONS ÉDITER / TESTER / SUPPRIMER */
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleMacro(m.id)}
-                              className={`mt-0.5 px-2 py-1 rounded-lg font-mono text-xs font-bold uppercase transition shrink-0 ${
-                                m.enabled
-                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30'
-                                  : 'bg-slate-800 text-slate-500 border border-slate-700'
-                              }`}
-                              title={m.enabled ? 'Cliquer pour désactiver' : 'Cliquer pour activer'}
-                            >
-                              Touche [{m.key}]
-                            </button>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 shrink-0 mt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleMacro(m.id)}
+                                className={`px-2 py-1 rounded-lg font-mono text-xs font-bold uppercase transition ${
+                                  m.enabled
+                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30'
+                                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                                }`}
+                                title={m.enabled ? 'Cliquer pour désactiver' : 'Cliquer pour activer'}
+                              >
+                                [{m.key}]
+                              </button>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                                  m.pressType === 'hold'
+                                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                    : 'bg-slate-800/80 text-slate-400 border-slate-700'
+                                }`}
+                                title={m.pressType === 'hold' ? `Appui long maintenu ${m.holdDuration || 1.5}s` : "Appui court standard"}
+                              >
+                                {m.pressType === 'hold' ? `⏳ Long (${m.holdDuration || 1.5}s)` : '⚡ Court'}
+                              </span>
+                            </div>
 
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-bold text-white flex items-center gap-2">
@@ -1300,13 +1432,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             {/* Bouton Tester la touche */}
                             <button
                               type="button"
-                              onClick={() => handleTestSingleKey(m.key, m.id)}
+                              onClick={() => handleTestSingleKey(m.key, m.id, m.pressType || 'tap', m.holdDuration || (m.pressType === 'hold' ? 1.5 : 0.18))}
                               className={`p-1.5 rounded-lg border transition text-xs flex items-center gap-1 ${
                                 testKeyFeedbackId === m.id
                                   ? 'bg-emerald-500/30 text-emerald-300 border-emerald-500/50'
                                   : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-cyan-300'
                               }`}
-                              title={`Tester la frappe physique de la touche [${m.key.toUpperCase()}]`}
+                              title={m.pressType === 'hold' ? `Tester l'appui long [${m.key.toUpperCase()}] (${m.holdDuration || 1.5}s)` : `Tester l'appui court [${m.key.toUpperCase()}]`}
                             >
                               {testKeyFeedbackId === m.id ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -1375,11 +1507,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="text"
                         value={newMacroKey}
                         onChange={(e) => setNewMacroKey(e.target.value)}
+                        onKeyDown={(e) => handleKeyInputKeyDown(e, 'new')}
                         placeholder="Ex: alt+n, lalt+j, u, space, f1..."
                         maxLength={20}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 font-mono uppercase focus:outline-none focus:border-accent-500"
                       />
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         <span className="text-[9px] text-slate-500">Ajouter :</span>
                         <button
                           type="button"
@@ -1403,7 +1536,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           + SHIFT
                         </button>
                       </div>
+
+                      {/* Barre d'insertion rapide Touches F1 à F12 */}
+                      <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-slate-800/60">
+                        <span className="text-[9px] text-slate-500 mr-0.5">Touches F :</span>
+                        {['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'].map((f) => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => setFunctionKey('new', f)}
+                            className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-slate-800 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-slate-700 active:scale-95 transition uppercase"
+                            title={`Sélectionner la touche ${f.toUpperCase()}`}
+                          >
+                            {f}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Sélecteur Appui Court vs Appui Long */}
+                  <div className="col-span-1 sm:col-span-2 pt-1 border-t border-slate-800/60">
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Type d&apos;appui sur la touche
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewMacroPressType('tap')}
+                        className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                          newMacroPressType === 'tap'
+                            ? 'bg-accent-600/30 border-accent-500 text-accent-200 shadow-sm'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <Zap className="w-3.5 h-3.5 text-accent-400" />
+                        <span>Appui Court (~0.2s)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewMacroPressType('hold')}
+                        className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                          newMacroPressType === 'hold'
+                            ? 'bg-purple-600/30 border-purple-500 text-purple-200 shadow-sm'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <Clock className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Appui Long (Maintenu)</span>
+                      </button>
+                    </div>
+
+                    {newMacroPressType === 'hold' && (
+                      <div className="flex items-center gap-2 mt-2 p-2 rounded-xl bg-purple-950/30 border border-purple-500/30 text-xs">
+                        <span className="text-[11px] text-purple-300 shrink-0">Durée du maintien :</span>
+                        {[1.0, 1.5, 2.0, 3.0].map((dur) => (
+                          <button
+                            key={dur}
+                            type="button"
+                            onClick={() => setNewMacroDuration(dur)}
+                            className={`px-2 py-0.5 rounded-lg text-[11px] font-mono transition ${
+                              newMacroDuration === dur
+                                ? 'bg-purple-600 text-white font-bold'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {dur}s
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 

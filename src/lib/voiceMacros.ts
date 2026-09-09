@@ -3,7 +3,9 @@ export interface VoiceMacro {
   id: string;
   name: string;
   phrases: string[]; // Phrases déclencheuses (ex: ["demarrer vaisseau", "sort le train"])
-  key: string; // Touche à presser (ex: "u", "r", "n", "b", "l", "p", "c")
+  key: string; // Touche à presser (ex: "u", "r", "n", "b", "l", "p", "c", "f1", "f2")
+  pressType?: 'tap' | 'hold'; // 'tap' = appui court (~180ms), 'hold' = appui long (~1.5s)
+  holdDuration?: number; // Durée de l'appui long en secondes (défaut: 1.5)
   confirmation: string; // Réponse vocale du compagnon
   enabled: boolean;
 }
@@ -224,7 +226,124 @@ export const DEFAULT_VOICE_MACROS: VoiceMacro[] = [
       'sas',
     ],
     key: 'k',
+    pressType: 'tap',
     confirmation: 'Sas et portes actionnés.',
+    enabled: true,
+  },
+  {
+    id: 'mobiglas',
+    name: 'mobiGlas (Menu Principal)',
+    phrases: [
+      'mobiglas',
+      'ouvre le mobiglas',
+      'ferme le mobiglas',
+      'menu',
+      'montre le mobiglas',
+      'affiche le mobiglas',
+    ],
+    key: 'f1',
+    pressType: 'tap',
+    confirmation: 'mobiGlas affiché.',
+    enabled: true,
+  },
+  {
+    id: 'starmap',
+    name: 'Carte Stellaire (StarMap)',
+    phrases: [
+      'carte',
+      'starmap',
+      'carte stellaire',
+      'ouvre la carte',
+      'affiche la carte',
+      'ouvre le starmap',
+    ],
+    key: 'f2',
+    pressType: 'tap',
+    confirmation: 'Carte stellaire StarMap ouverte.',
+    enabled: true,
+  },
+  {
+    id: 'camera_toggle',
+    name: 'Vue Caméra / 3ème Personne',
+    phrases: [
+      'change de vue',
+      'vue exterieure',
+      'troisieme personne',
+      'vue externe',
+      'camera exterieure',
+      'vue cockpit',
+    ],
+    key: 'f4',
+    pressType: 'tap',
+    confirmation: 'Vue caméra basculée.',
+    enabled: true,
+  },
+  {
+    id: 'comms_atc',
+    name: 'Communications / Fréquences ATC',
+    phrases: [
+      'communications',
+      'comms',
+      'ouvre les communications',
+      'frequences radio',
+      'canaux de communication',
+    ],
+    key: 'f11',
+    pressType: 'tap',
+    confirmation: 'Écran des communications ouvert.',
+    enabled: true,
+  },
+  {
+    id: 'exit_seat',
+    name: 'Sortir du Siège / Cockpit (Appui Long)',
+    phrases: [
+      'quitter le siege',
+      'quitte le siege',
+      'sortir du siege',
+      'sors du siege',
+      'sortir du cockpit',
+      'debout',
+      'leve toi',
+      'quitter le poste',
+    ],
+    key: 'y',
+    pressType: 'hold',
+    holdDuration: 1.5,
+    confirmation: 'Sortie du siège en cours, Commandant.',
+    enabled: true,
+  },
+  {
+    id: 'emergency_eject',
+    name: "Éjection d'Urgence (Appui Long)",
+    phrases: [
+      'ejection durgence',
+      'ejection',
+      'ejecte toi',
+      'abandonner le navire',
+      'abandonner le vaisseau',
+      'abandonne le vaisseau',
+    ],
+    key: 'alt+l',
+    pressType: 'hold',
+    holdDuration: 1.5,
+    confirmation: "Procédure d'éjection d'urgence enclenchée !",
+    enabled: true,
+  },
+  {
+    id: 'quantum_jump_engage',
+    name: 'Saut Quantique - Engage (Appui Long)',
+    phrases: [
+      'engage le quantum',
+      'engage le saut',
+      'saute en quantum',
+      'lancer le saut',
+      'enclenche le saut',
+      'jump',
+    ],
+    key: 'b',
+    pressType: 'hold',
+    holdDuration: 1.5,
+    confirmation: 'Saut quantique engagé, accrochez-vous !',
     enabled: true,
   },
 ];
@@ -341,6 +460,12 @@ export const macroManager = {
           parsed.push(def);
           updated = true;
         } else {
+          // Migrer pressType et holdDuration si absents
+          if (!existing.pressType && def.pressType) {
+            existing.pressType = def.pressType;
+            if (def.holdDuration) existing.holdDuration = def.holdDuration;
+            updated = true;
+          }
           const phraseSet = new Set(existing.phrases.map((p) => p.toLowerCase().trim()));
           for (const phrase of def.phrases) {
             if (!phraseSet.has(phrase.toLowerCase().trim())) {
@@ -350,6 +475,15 @@ export const macroManager = {
           }
         }
       }
+
+      // S'assurer que toutes les macros ont au moins pressType='tap'
+      for (const m of parsed) {
+        if (!m.pressType) {
+          m.pressType = 'tap';
+          updated = true;
+        }
+      }
+
       if (updated) {
         this.saveMacros(parsed);
       }
@@ -364,18 +498,28 @@ export const macroManager = {
     localStorage.setItem(STORAGE_KEY_MACROS, JSON.stringify(macros));
   },
 
-  async sendKeyToBridge(key: string): Promise<{ success: boolean; bridgeUrl: string; error?: string }> {
+  async sendKeyToBridge(
+    key: string,
+    pressType: 'tap' | 'hold' = 'tap',
+    duration?: number
+  ): Promise<{ success: boolean; bridgeUrl: string; error?: string }> {
     const candidateUrls = this.getCandidateUrls();
+    const effectiveDuration = duration ?? (pressType === 'hold' ? 1.5 : 0.18);
+    const timeoutMs = Math.max(1500, Math.round(effectiveDuration * 1000) + 1500);
 
     for (const url of candidateUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const res = await fetch(`${url}/press`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: key.toLowerCase().trim() }),
+          body: JSON.stringify({
+            key: key.toLowerCase().trim(),
+            pressType,
+            duration: effectiveDuration,
+          }),
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -435,7 +579,8 @@ export const macroManager = {
           .trim();
 
         if (normalized.includes(normPhrase)) {
-          console.log(`⚡ Macro vocale détectée : "${macro.name}" ➔ Touche [${macro.key.toUpperCase()}]`);
+          const typeLabel = macro.pressType === 'hold' ? ' [APPUI LONG 1.5s]' : '';
+          console.log(`⚡ Macro vocale détectée : "${macro.name}" ➔ Touche [${macro.key.toUpperCase()}]${typeLabel}`);
 
           // Vérifier si nous sommes sur un site distant HTTPS (GitHub Pages) qui bloque les appels HTTP locaux
           if (this.isHttpsContext()) {
@@ -447,8 +592,12 @@ export const macroManager = {
             };
           }
 
-          // Envoi de la touche au pont clavier
-          const result = await this.sendKeyToBridge(macro.key);
+          // Envoi de la touche au pont clavier avec type d'appui et durée
+          const result = await this.sendKeyToBridge(
+            macro.key,
+            macro.pressType || 'tap',
+            macro.holdDuration
+          );
 
           if (!result.success) {
             return {

@@ -14,6 +14,7 @@ import {
   Link2,
   Eye,
   EyeOff,
+  Settings,
 } from 'lucide-react';
 
 export type LiveCallState = 'listening' | 'thinking' | 'speaking';
@@ -29,6 +30,7 @@ interface ConversationModalProps {
   onSendMessage: (text: string) => void;
   isVisionActive?: boolean;
   onToggleVision?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const ConversationModal: React.FC<ConversationModalProps> = ({
@@ -42,6 +44,7 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
   onSendMessage,
   isVisionActive,
   onToggleVision,
+  onOpenSettings,
 }) => {
   const [inputText, setInputText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +109,16 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
             <Sparkles className="w-3 h-3 text-accent-400" />
             <span>{profile.name}</span>
           </div>
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              type="button"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white transition active:scale-95"
+              title="Paramètres du compagnon"
+            >
+              <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+          )}
         </div>
       </header>
 

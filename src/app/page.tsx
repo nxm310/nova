@@ -514,14 +514,16 @@ export default function CompanionApp() {
         imageBase64,
       });
 
-      // Détection et déclenchement des actions Star Citizen de l'IA via le pont clavier
-      const actionMatch = botReply.match(/\[ACTION:KEY:([a-zA-Z0-9+_]+)\]/i);
+      // Détection et déclenchement des actions Star Citizen de l'IA via le pont clavier (Appui court ou Appui long)
+      const actionMatch = botReply.match(/\[ACTION:(KEY|HOLD):([a-zA-Z0-9+_]+)\]/i);
       let displayReply = botReply;
       if (actionMatch) {
-        const keyToPress = actionMatch[1];
-        displayReply = botReply.replace(/\[ACTION:KEY:[a-zA-Z0-9+_]+\]/gi, '').trim();
-        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] ➔ Envoi au pont PC...`);
-        macroManager.sendKeyToBridge(keyToPress);
+        const actionType = actionMatch[1].toUpperCase();
+        const keyToPress = actionMatch[2];
+        const isHold = actionType === 'HOLD';
+        displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
+        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? 'APPUI LONG 1.5s' : 'APPUI COURT'}) ➔ Envoi au pont PC...`);
+        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', isHold ? 1.5 : 0.18);
       }
 
       const botMessage: ChatMessage = {
@@ -655,14 +657,16 @@ export default function CompanionApp() {
         imageBase64,
       });
 
-      // Détection et exécution des actions Star Citizen de l'IA via le pont clavier
-      const actionMatch = botReply.match(/\[ACTION:KEY:([a-zA-Z0-9+_]+)\]/i);
+      // Détection et exécution des actions Star Citizen de l'IA via le pont clavier (Appui court ou Appui long)
+      const actionMatch = botReply.match(/\[ACTION:(KEY|HOLD):([a-zA-Z0-9+_]+)\]/i);
       let displayReply = botReply;
       if (actionMatch) {
-        const keyToPress = actionMatch[1];
-        displayReply = botReply.replace(/\[ACTION:KEY:[a-zA-Z0-9+_]+\]/gi, '').trim();
-        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] ➔ Envoi au pont PC...`);
-        macroManager.sendKeyToBridge(keyToPress);
+        const actionType = actionMatch[1].toUpperCase();
+        const keyToPress = actionMatch[2];
+        const isHold = actionType === 'HOLD';
+        displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
+        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? 'APPUI LONG 1.5s' : 'APPUI COURT'}) ➔ Envoi au pont PC...`);
+        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', isHold ? 1.5 : 0.18);
       }
 
       const botMessage: ChatMessage = {
@@ -1173,6 +1177,7 @@ export default function CompanionApp() {
         onSendMessage={handleSendCallText}
         isVisionActive={isVisionActive}
         onToggleVision={handleToggleVision}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* Modal de Mise à Jour 1-Clic */}
