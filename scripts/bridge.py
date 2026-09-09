@@ -1,20 +1,37 @@
 #!/usr/bin/env python3
 """
-Micro-Pont Clavier DirectInput pour Star Citizen (Companion Key Bridge)
-Permet à l'application compagnon Ami / Nova de presser des touches physiques en jeu
-(ex: Touche 'U' pour le démarrage du vaisseau, 'N' pour le train d'atterrissage, 'B' pour le quantum, etc.)
+🚀 NOVA — Compagnon Tout-en-un pour Star Citizen
+Serveur Web Local + Micro-Pont Clavier DirectInput
 
-Sur votre PC Windows de jeu :
-    Double-cliquez sur LANCER_PONT_PC.bat
-    ou lancez dans un terminal : python scripts/bridge.py
+Lancez ce script ou double-cliquez sur DEMARRER_NOVA.bat :
+1. Démarre le serveur local sur le port 5005
+2. Ouvre automatiquement votre navigateur sur l'application Nova
+3. Permet les frappes physiques en jeu sans aucune configuration requise !
 """
 
-import json
+import os
 import sys
+import json
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+import webbrowser
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 PORT = 5005
+
+# Déterminer le dossier des fichiers statiques de l'application (out)
+if getattr(sys, 'frozen', False):
+    # Mode binaire autonome PyInstaller (.exe)
+    BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    OUT_DIR = os.path.join(BASE_DIR, 'out')
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    OUT_DIR = os.path.join(BASE_DIR, 'out')
+
+if not os.path.exists(OUT_DIR):
+    alt = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out')
+    if os.path.exists(alt):
+        OUT_DIR = alt
 
 # Détection des modules d'injection clavier
 has_directinput = False
@@ -24,36 +41,20 @@ is_windows = sys.platform == "win32"
 try:
     import pydirectinput
     has_directinput = True
-    print("[INFO] Moteur PyDirectInput detecte.")
 except ImportError:
     pass
 
 try:
     import pyautogui
     has_pyautogui = True
-    print("[INFO] Moteur PyAutoGUI detecte.")
 except ImportError:
     pass
 
-# DirectInput natif Windows via ctypes (zero dependance requise)
 SCANCODES = {
-    'u': 0x16,  # Power toggle
-    'r': 0x13,  # Flight ready
-    'i': 0x17,  # Engines toggle
-    'o': 0x18,  # Shields toggle
-    'n': 0x31,  # Landing gear
-    'b': 0x30,  # Quantum drive
-    'l': 0x26,  # Headlights
-    'p': 0x19,  # Weapons
-    'c': 0x2E,  # Cruise control
-    'k': 0x25,  # Doors
-    'j': 0x24,  # VTOL
-    'v': 0x2F,  # Decoupled
-    'm': 0x32,  # Mining mode
-    'g': 0x22,  # Gimbal lock
-    'space': 0x39,
+    'u': 0x16, 'r': 0x13, 'i': 0x17, 'o': 0x18, 'n': 0x31, 'b': 0x30,
+    'l': 0x26, 'p': 0x19, 'c': 0x2E, 'k': 0x25, 'j': 0x24, 'v': 0x2F,
+    'm': 0x32, 'g': 0x22, 'space': 0x39,
 }
-
 
 def send_directinput_native_windows(k: str):
     import ctypes
@@ -97,19 +98,16 @@ def send_directinput_native_windows(k: str):
             vk = ctypes.windll.user32.VkKeyScanA(ctypes.c_char(k[:1].encode('ascii', 'ignore') or b'a')) & 0xFF
             code = ctypes.windll.user32.MapVirtualKeyA(vk, 0)
         except Exception:
-            code = 0x16  # fallback u
+            code = 0x16
 
     extra = ctypes.c_ulong(0)
     ii_ = Input_I()
-
-    # Appui de la touche (KeyDown)
     ii_.ki = KeyBdInput(0, code, KEYEVENTF_SCANCODE, 0, ctypes.pointer(extra))
     x = Input(ctypes.c_ulong(1), ii_)
     ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
-    time.sleep(0.12)  # Durée requise pour que le moteur Star Citizen détecte la pression
+    time.sleep(0.12)
 
-    # Relâchement de la touche (KeyUp)
     ii_.ki = KeyBdInput(0, code, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP, 0, ctypes.pointer(extra))
     x = Input(ctypes.c_ulong(1), ii_)
     ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
@@ -118,7 +116,7 @@ def send_directinput_native_windows(k: str):
 def press_key(key_name: str):
     k = key_name.lower().strip()
     heure = time.strftime("%H:%M:%S")
-    print(f"🎮 [{heure}] ORDRE RECU ➔ Touche : '{k.upper()}'")
+    print(f"🎮 [{heure}] ORDRE VOCAL ➔ Touche : [{k.upper()}]")
 
     if is_windows:
         if has_directinput:
@@ -126,50 +124,79 @@ def press_key(key_name: str):
             pydirectinput.keyDown(k)
             time.sleep(0.12)
             pydirectinput.keyUp(k)
-            print(f"   ✓ Touche '{k.upper()}' envoyee via PyDirectInput dans Star Citizen !")
+            print(f"   ✓ [{k.upper()}] envoyée via PyDirectInput dans Star Citizen !")
         else:
             send_directinput_native_windows(k)
-            print(f"   ✓ Touche '{k.upper()}' envoyee via DirectInput Windows Natif (ctypes) !")
+            print(f"   ✓ [{k.upper()}] envoyée via DirectInput Natif dans Star Citizen !")
     elif has_pyautogui:
         import pyautogui
         pyautogui.keyDown(k)
         time.sleep(0.12)
         pyautogui.keyUp(k)
-        print(f"   ✓ Touche '{k.upper()}' envoyee via PyAutoGUI.")
+        print(f"   ✓ [{k.upper()}] envoyée via PyAutoGUI.")
     elif sys.platform == "darwin":
         import os
         os.system(f"""osascript -e 'tell application "System Events" to keystroke "{k}"' 2>/dev/null || true""")
-        print(f"   ✓ Touche '{k.upper()}' simulee sur macOS.")
+        print(f"   ✓ [{k.upper()}] simulée sur macOS.")
     else:
-        print(f"   ✓ Simulation mode test pour la touche '{k.upper()}'.")
+        print(f"   ✓ [{k.upper()}] test simulation.")
 
 
-class BridgeHandler(BaseHTTPRequestHandler):
-    def _send_cors_headers(self):
+class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=OUT_DIR, **kwargs)
+
+    def _send_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def do_OPTIONS(self):
         self.send_response(200)
-        self._send_cors_headers()
+        self._send_cors()
         self.end_headers()
+
+    def translate_path(self, path):
+        cleaned = path.split('?')[0].split('#')[0]
+        if cleaned.startswith('/nova/'):
+            cleaned = cleaned[5:]
+        elif cleaned == '/nova':
+            cleaned = '/'
+
+        local_path = super().translate_path(cleaned)
+
+        if not os.path.exists(local_path) and not '.' in os.path.basename(local_path):
+            return os.path.join(OUT_DIR, 'index.html')
+
+        return local_path
 
     def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self._send_cors_headers()
-        self.end_headers()
-        info = {
-            "status": "ready",
-            "name": "Star Citizen Companion Key Bridge",
-            "directInput": has_directinput or is_windows,
-            "platform": sys.platform,
-        }
-        self.wfile.write(json.dumps(info).encode("utf-8"))
+        clean = self.path.split('?')[0]
+        if clean in ('/status', '/nova/status'):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            info = {
+                "status": "ready",
+                "name": "Nova Star Citizen Unified Companion",
+                "directInput": has_directinput or is_windows,
+                "platform": sys.platform,
+            }
+            self.wfile.write(json.dumps(info).encode("utf-8"))
+            return
+
+        if clean in ('', '/'):
+            self.send_response(302)
+            self.send_header('Location', '/nova/')
+            self.end_headers()
+            return
+
+        return super().do_GET()
 
     def do_POST(self):
-        if self.path == "/press":
+        clean = self.path.split('?')[0]
+        if clean in ('/press', '/nova/press'):
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             try:
@@ -179,7 +206,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     press_key(key)
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
-                    self._send_cors_headers()
+                    self._send_cors()
                     self.end_headers()
                     self.wfile.write(json.dumps({"success": True, "key": key}).encode("utf-8"))
                     return
@@ -187,24 +214,39 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 print(f"[ERREUR] {e}")
 
         self.send_response(400)
-        self._send_cors_headers()
+        self._send_cors()
         self.end_headers()
 
     def log_message(self, format, *args):
         pass
 
 
+def open_browser():
+    time.sleep(1.2)
+    url = f"http://localhost:{PORT}/nova/"
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+
+
 def run():
-    server = HTTPServer(("0.0.0.0", PORT), BridgeHandler)
-    print("=" * 65)
-    print(f"🚀 PONT CLAVIER STAR CITIZEN OPERATIONNEL (PORT {PORT})")
-    print("   L'application compagnon Ami / Nova peut maintenant presser")
-    print("   physiquement vos touches en jeu des que vous parlez !")
-    print("=" * 65)
+    server = HTTPServer(("0.0.0.0", PORT), UnifiedCompanionHandler)
+    print("=" * 68)
+    print(f"🚀 NOVA — COMPAGNON STAR CITIZEN TOUT-EN-UN (PORT {PORT})")
+    print("=" * 68)
+    print(f"  ✓ Application & Pont clavier disponibles sur : http://localhost:{PORT}/nova/")
+    print(f"  ✓ Ouverture automatique de votre navigateur...")
+    print(f"  ✓ Commandes vocales Star Citizen prêtes (U, R, N, B, L, P, C, K...)")
+    print("  ✓ Gardez simplement cette fenêtre ouverte pendant votre session de jeu !")
+    print("=" * 68)
+
+    threading.Thread(target=open_browser, daemon=True).start()
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nArrêt du pont.")
+        print("\nArrêt du compagnon.")
         server.server_close()
 
 
