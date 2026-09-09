@@ -87,6 +87,51 @@ export const DEFAULT_VOICE_MACROS: VoiceMacro[] = [
     enabled: true,
   },
   {
+    id: 'landing_request',
+    name: "Demande d'atterrissage (Tour ATC)",
+    phrases: [
+      "demande d'atterrissage",
+      "demande datterrissage",
+      "contacte la tour",
+      "autorisation d'atterrir",
+      "demander atterrissage",
+      "autorise atterrissage",
+      "demande atterrissage",
+      "contact la tour",
+    ],
+    key: 'alt+n',
+    confirmation: "Demande d'atterrissage transmise à la tour de contrôle.",
+    enabled: true,
+  },
+  {
+    id: 'vtol_mode',
+    name: 'Mode VTOL (Propulseurs verticaux)',
+    phrases: [
+      'mode vtol',
+      'active le vtol',
+      'bascule le vtol',
+      'vtol',
+      'propulseurs verticaux',
+    ],
+    key: 'alt+j',
+    confirmation: 'Propulseurs verticaux VTOL basculés.',
+    enabled: true,
+  },
+  {
+    id: 'decoupled_mode',
+    name: 'Mode Découplé (Decoupled)',
+    phrases: [
+      'mode decouple',
+      'mode decouplage',
+      'decouple',
+      'vol decouple',
+      'decouplage',
+    ],
+    key: 'alt+c',
+    confirmation: 'Mode de vol découplé basculé.',
+    enabled: true,
+  },
+  {
     id: 'quantum_drive',
     name: 'Moteur Quantique (Quantum)',
     phrases: [
@@ -189,10 +234,20 @@ export const macroManager = {
     if (!saved) return DEFAULT_VOICE_MACROS;
     try {
       const parsed: VoiceMacro[] = JSON.parse(saved);
-      // S'assurer que les macros par défaut comme 'ship_power' existent
-      const hasPower = parsed.some((m) => m.key.toLowerCase() === 'u');
-      if (!hasPower) {
-        parsed.unshift(DEFAULT_VOICE_MACROS[0]); // Ajouter ship_power
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return DEFAULT_VOICE_MACROS;
+      }
+
+      // Fusionner les nouvelles macros par défaut sans écraser les modifications de l'utilisateur
+      const existingIds = new Set(parsed.map((m) => m.id));
+      let updated = false;
+      for (const def of DEFAULT_VOICE_MACROS) {
+        if (!existingIds.has(def.id)) {
+          parsed.push(def);
+          updated = true;
+        }
+      }
+      if (updated) {
         this.saveMacros(parsed);
       }
       return parsed;

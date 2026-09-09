@@ -41,6 +41,7 @@ jobs:
       - name: Compile Standalone Executable with PyInstaller
         run: |
           pyinstaller --noconfirm --onedir --console `
+            --uac-admin `
             --name "Nova-StarCitizen" `
             --add-data "out;out" `
             scripts/bridge.py

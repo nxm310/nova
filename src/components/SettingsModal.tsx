@@ -31,6 +31,8 @@ import {
   EyeOff,
   Gamepad2,
   Radio,
+  Edit2,
+  RotateCcw,
 } from 'lucide-react';
 import { macroManager, VoiceMacro, DEFAULT_VOICE_MACROS } from '@/lib/voiceMacros';
 
@@ -76,6 +78,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newMacroPhrases, setNewMacroPhrases] = useState('');
   const [newMacroReply, setNewMacroReply] = useState('');
 
+  // Édition en place d'une macro existante (intégrée ou personnalisée)
+  const [editingMacroId, setEditingMacroId] = useState<string | null>(null);
+  const [editMacroName, setEditMacroName] = useState<string>('');
+  const [editMacroKey, setEditMacroKey] = useState<string>('');
+  const [editMacroPhrases, setEditMacroPhrases] = useState<string>('');
+  const [editMacroReply, setEditMacroReply] = useState<string>('');
+  const [testKeyFeedbackId, setTestKeyFeedbackId] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       setFormData(profile);
@@ -84,6 +94,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setMacros(macroManager.getMacros());
       setBridgeUrl(macroManager.getBridgeUrl());
       setBridgeStatus(null);
+      setEditingMacroId(null);
     }
   }, [isOpen, profile]);
 
@@ -118,6 +129,70 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const appendModifier = (target: 'new' | 'edit', modifier: string) => {
+    if (target === 'new') {
+      const cur = newMacroKey.trim();
+      if (!cur) {
+        setNewMacroKey(modifier + '+');
+      } else if (!cur.toLowerCase().includes(modifier.toLowerCase())) {
+        setNewMacroKey(`${modifier}+${cur.replace(/^\+/, '')}`);
+      }
+    } else {
+      const cur = editMacroKey.trim();
+      if (!cur) {
+        setEditMacroKey(modifier + '+');
+      } else if (!cur.toLowerCase().includes(modifier.toLowerCase())) {
+        setEditMacroKey(`${modifier}+${cur.replace(/^\+/, '')}`);
+      }
+    }
+  };
+
+  const handleStartEditMacro = (m: VoiceMacro) => {
+    setEditingMacroId(m.id);
+    setEditMacroName(m.name);
+    setEditMacroKey(m.key);
+    setEditMacroPhrases(m.phrases.join(', '));
+    setEditMacroReply(m.confirmation);
+  };
+
+  const handleCancelEditMacro = () => {
+    setEditingMacroId(null);
+  };
+
+  const handleSaveEditMacro = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMacroId || !editMacroName.trim() || !editMacroKey.trim() || !editMacroPhrases.trim()) return;
+
+    const phrases = editMacroPhrases
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const updated = macros.map((m) => {
+      if (m.id !== editingMacroId) return m;
+      return {
+        ...m,
+        name: editMacroName.trim(),
+        key: editMacroKey.trim().toLowerCase(),
+        phrases: phrases.length > 0 ? phrases : [editMacroName.trim().toLowerCase()],
+        confirmation: editMacroReply.trim() || `Commande ${editMacroName.trim()} exécutée.`,
+      };
+    });
+
+    setMacros(updated);
+    macroManager.saveMacros(updated);
+    setEditingMacroId(null);
+  };
+
+  const handleTestSingleKey = async (macroKey: string, macroId: string) => {
+    setTestKeyFeedbackId(macroId);
+    const res = await macroManager.sendKeyToBridge(macroKey);
+    setTimeout(() => setTestKeyFeedbackId(null), 1500);
+    if (!res.success) {
+      alert("Le pont clavier n'a pas répondu. Vérifiez que DEMARRER_NOVA.bat est bien lancé sur votre PC avec les droits Administrateur.");
+    }
+  };
+
   const handleAddCustomMacro = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMacroName.trim() || !newMacroKey.trim() || !newMacroPhrases.trim()) return;
@@ -147,6 +222,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleDeleteMacro = (id: string) => {
+    if (editingMacroId === id) setEditingMacroId(null);
     const updated = macros.filter((m) => m.id !== id);
     setMacros(updated);
     macroManager.saveMacros(updated);
@@ -159,9 +235,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleResetDefaultMacros = () => {
-    if (confirm('Rétablir les macros par défaut de Star Citizen (Train N, Quantum B, Phares L, Armes P, etc.) ?')) {
+    if (confirm('Rétablir les macros par défaut de Star Citizen (Train N, Atterrissage ALT+N, VTOL ALT+J, Power U, etc.) ?')) {
       setMacros(DEFAULT_VOICE_MACROS);
       macroManager.saveMacros(DEFAULT_VOICE_MACROS);
+      setEditingMacroId(null);
     }
   };
 
@@ -969,56 +1046,216 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
 
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {macros.map((m) => (
                     <div
                       key={m.id}
-                      className={`p-3 rounded-xl border transition flex items-start justify-between gap-3 ${
-                        m.enabled
+                      className={`p-3 rounded-xl border transition ${
+                        editingMacroId === m.id
+                          ? 'bg-slate-900/90 border-cyan-500/50 shadow-lg shadow-cyan-950/40'
+                          : m.enabled
                           ? 'bg-slate-950/60 border-slate-800'
                           : 'bg-slate-950/30 border-slate-900 opacity-50'
                       }`}
                     >
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleMacro(m.id)}
-                          className={`mt-0.5 px-2 py-1 rounded-lg font-mono text-xs font-bold uppercase transition shrink-0 ${
-                            m.enabled
-                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                              : 'bg-slate-800 text-slate-500 border border-slate-700'
-                          }`}
-                          title={m.enabled ? 'Cliquer pour désactiver' : 'Cliquer pour activer'}
-                        >
-                          Touche [{m.key}]
-                        </button>
+                      {editingMacroId === m.id ? (
+                        /* FORMULAIRE D'ÉDITION EN PLACE */
+                        <form onSubmit={handleSaveEditMacro} className="space-y-3">
+                          <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                            <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                              <Edit2 className="w-3.5 h-3.5" />
+                              Modifier la commande : {m.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleCancelEditMacro}
+                              className="text-[11px] text-slate-400 hover:text-slate-200"
+                            >
+                              Annuler
+                            </button>
+                          </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-white flex items-center gap-2">
-                            <span>{m.name}</span>
-                            {!m.enabled && (
-                              <span className="text-[10px] text-slate-500 font-normal">
-                                (Désactivée)
-                              </span>
-                            )}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-1">
+                                Nom de la commande
+                              </label>
+                              <input
+                                type="text"
+                                value={editMacroName}
+                                onChange={(e) => setEditMacroName(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-1">
+                                Touche / Raccourci clavier
+                              </label>
+                              <div className="space-y-1.5">
+                                <input
+                                  type="text"
+                                  value={editMacroKey}
+                                  onChange={(e) => setEditMacroKey(e.target.value)}
+                                  placeholder="Ex: alt+n, lalt+j, u, space..."
+                                  maxLength={20}
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono uppercase focus:outline-none focus:border-cyan-500"
+                                />
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] text-slate-500">Ajouter modif. :</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => appendModifier('edit', 'alt')}
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                                  >
+                                    + ALT
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => appendModifier('edit', 'ctrl')}
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                                  >
+                                    + CTRL
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => appendModifier('edit', 'shift')}
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                                  >
+                                    + SHIFT
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                            🗣️ {m.phrases.join(' • ')}
+
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">
+                              Phrases vocales déclencheuses (séparées par une virgule)
+                            </label>
+                            <input
+                              type="text"
+                              value={editMacroPhrases}
+                              onChange={(e) => setEditMacroPhrases(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                            />
                           </div>
-                          <div className="text-[11px] text-emerald-400/90 italic truncate mt-0.5">
-                            « {m.confirmation} »
+
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">
+                              Confirmation vocale prononcée par Ami
+                            </label>
+                            <input
+                              type="text"
+                              value={editMacroReply}
+                              onChange={(e) => setEditMacroReply(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleTestSingleKey(editMacroKey, m.id)}
+                              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-[11px] font-medium border border-slate-700 flex items-center gap-1"
+                            >
+                              <Play className="w-3 h-3" />
+                              Tester [{editMacroKey.toUpperCase() || '?'}]
+                            </button>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelEditMacro}
+                                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium"
+                              >
+                                Annuler
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-3.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold shadow"
+                              >
+                                Enregistrer la commande
+                              </button>
+                            </div>
+                          </div>
+                        </form>
+                      ) : (
+                        /* AFFICHAGE STANDARD AVEC ACTIONS ÉDITER / TESTER / SUPPRIMER */
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleMacro(m.id)}
+                              className={`mt-0.5 px-2 py-1 rounded-lg font-mono text-xs font-bold uppercase transition shrink-0 ${
+                                m.enabled
+                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30'
+                                  : 'bg-slate-800 text-slate-500 border border-slate-700'
+                              }`}
+                              title={m.enabled ? 'Cliquer pour désactiver' : 'Cliquer pour activer'}
+                            >
+                              Touche [{m.key}]
+                            </button>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-white flex items-center gap-2">
+                                <span>{m.name}</span>
+                                {!m.enabled && (
+                                  <span className="text-[10px] text-slate-500 font-normal">
+                                    (Désactivée)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                                🗣️ {m.phrases.join(' • ')}
+                              </div>
+                              <div className="text-[11px] text-emerald-400/90 italic truncate mt-0.5">
+                                « {m.confirmation} »
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {/* Bouton Tester la touche */}
+                            <button
+                              type="button"
+                              onClick={() => handleTestSingleKey(m.key, m.id)}
+                              className={`p-1.5 rounded-lg border transition text-xs flex items-center gap-1 ${
+                                testKeyFeedbackId === m.id
+                                  ? 'bg-emerald-500/30 text-emerald-300 border-emerald-500/50'
+                                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-cyan-300'
+                              }`}
+                              title={`Tester la frappe physique de la touche [${m.key.toUpperCase()}]`}
+                            >
+                              {testKeyFeedbackId === m.id ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Play className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            {/* Bouton Éditer la touche et la commande */}
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditMacro(m)}
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-800 transition"
+                              title="Modifier la touche ou l'ordre verbal"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Bouton Supprimer */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMacro(m.id)}
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-500 hover:text-red-400 border border-slate-800 transition"
+                              title="Supprimer cette commande"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMacro(m.id)}
-                        className="text-slate-500 hover:text-red-400 p-1 transition shrink-0"
-                        title="Supprimer cette commande"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1052,14 +1289,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <label className="block text-[11px] text-slate-400 mb-1">
                       Touche clavier à presser
                     </label>
-                    <input
-                      type="text"
-                      value={newMacroKey}
-                      onChange={(e) => setNewMacroKey(e.target.value)}
-                      placeholder="Ex: n, b, l, p, c, k, space..."
-                      maxLength={10}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 font-mono uppercase focus:outline-none focus:border-accent-500"
-                    />
+                    <div className="space-y-1.5">
+                      <input
+                        type="text"
+                        value={newMacroKey}
+                        onChange={(e) => setNewMacroKey(e.target.value)}
+                        placeholder="Ex: alt+n, lalt+j, u, space, f1..."
+                        maxLength={20}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 font-mono uppercase focus:outline-none focus:border-accent-500"
+                      />
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-slate-500">Ajouter :</span>
+                        <button
+                          type="button"
+                          onClick={() => appendModifier('new', 'alt')}
+                          className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                        >
+                          + ALT
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => appendModifier('new', 'ctrl')}
+                          className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                        >
+                          + CTRL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => appendModifier('new', 'shift')}
+                          className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                        >
+                          + SHIFT
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
