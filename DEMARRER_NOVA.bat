@@ -22,27 +22,56 @@ echo         🚀  NOVA — COMPAGNON VOCAL STAR CITIZEN
 echo ==================================================================
 echo   ✓ Droits Administrateur : ACTIFS (Star Citizen debloque)
 echo.
-echo Verification de Python sur votre systeme...
-python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERREUR] Python n'est pas detecte sur votre ordinateur.
-    echo 1. Rendez-vous sur https://www.python.org/downloads/
-    echo 2. Important : Cochez "Add Python to PATH" lors de l'installation.
+:: 1. CAS 1 : Exécutable autonome Nova-StarCitizen.exe (Version ZIP sans Python requis)
+if exist "Nova-StarCitizen.exe" (
+    echo [OK] Version autonome detectee : Nova-StarCitizen.exe
+    echo Demarrage du compagnon et du pont clavier...
     echo.
+    Nova-StarCitizen.exe
     pause
     exit /b
 )
 
-:: Verification de pydirectinput
-python -c "import pydirectinput" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [INSTALLATION] Installation automatique de pydirectinput pour Star Citizen...
-    pip install pydirectinput
+:: 2. CAS 2 : Lancement depuis le dossier source Git avec dossier scripts
+if exist "scripts\bridge.py" (
+    echo [OK] Depot source detecte. Verification de Python...
+    python --version >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [ERREUR] Python n'est pas installe sur votre ordinateur.
+        echo Pour jouer sans installer Python, telechargez directement le fichier
+        echo 'Nova-StarCitizen-Windows.zip' sur GitHub :
+        echo https://github.com/nxm310/nova/releases
+        echo.
+        pause
+        exit /b
+    )
+
+    python -c "import pydirectinput" >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [INSTALLATION] Installation automatique de pydirectinput...
+        pip install pydirectinput
+    )
+
+    echo Demarrage du pont clavier...
+    python scripts\bridge.py
+    pause
+    exit /b
 )
 
-echo.
-echo Demarrage du compagnon et du pont clavier...
-echo Votre navigateur va s'ouvrir automatiquement sur l'application !
-echo.
-python scripts/bridge.py
+:: 3. CAS 3 : Lancement depuis le dossier scripts
+if exist "bridge.py" (
+    echo [OK] Script bridge.py detecte. Verification de Python...
+    python --version >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [ERREUR] Python n'est pas installe.
+        pause
+        exit /b
+    )
+    python bridge.py
+    pause
+    exit /b
+)
+
+echo [ERREUR] Aucun composant Nova trouve (Nova-StarCitizen.exe ou bridge.py introuvable).
+echo Veuillez extraire l'integralite du fichier ZIP avant de lancer ce script.
 pause

@@ -72,7 +72,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Macros & Pont Clavier
   const [macros, setMacros] = useState<VoiceMacro[]>([]);
-  const [bridgeUrl, setBridgeUrl] = useState<string>('http://192.168.50.34:5005');
+  const [bridgeUrl, setBridgeUrl] = useState<string>('');
   const [bridgeTesting, setBridgeTesting] = useState<boolean>(false);
   const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
 
@@ -182,14 +182,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setBridgeTesting(true);
     setBridgeStatus(null);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch(bridgeUrl, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (res.ok) {
-        setBridgeStatus('connecté');
+      const res = await macroManager.checkBridgeHealth();
+      if (res.online) {
+        if (res.url) {
+          setBridgeUrl(res.url);
+          macroManager.setBridgeUrl(res.url);
+        }
+        const adminTag = res.info?.isAdmin ? ' (Admin ✓)' : ' (Non-Admin ⚠️)';
+        setBridgeStatus(`connecté${adminTag}`);
       } else {
-        setBridgeStatus('erreur');
+        setBridgeStatus('inaccessible');
       }
     } catch {
       setBridgeStatus('inaccessible');
@@ -1033,14 +1035,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Pont Clavier PC (DirectInput)
                     </h3>
                   </div>
-                  {bridgeStatus === 'connecté' && (
+                  {bridgeStatus?.startsWith('connecté') && (
                     <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Connecté
+                      <Check className="w-3 h-3" /> {bridgeStatus}
                     </span>
                   )}
                   {bridgeStatus === 'inaccessible' && (
                     <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
-                      Inaccessible
+                      Déconnecté
                     </span>
                   )}
                 </div>
@@ -1052,14 +1054,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
                   <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-xs text-amber-200 space-y-1.5">
                     <div className="font-semibold flex items-center gap-1.5 text-amber-300">
-                      <span>⚠️ Navigation HTTPS détectée (github.io)</span>
+                      <span>⚠️ Navigation HTTPS distante détectée</span>
                     </div>
                     <p className="leading-relaxed text-[11px] text-amber-200/90">
-                      Les navigateurs interdisent à un site web distant sécurisé (HTTPS) de joindre directement votre PC en HTTP local (règle de sécurité Mixed Content).
+                      Les navigateurs interdisent à un site web distant sécurisé (HTTPS) de communiquer directement avec votre PC en HTTP local (sécurité Mixed Content).
                     </p>
                     <p className="leading-relaxed text-[11px] font-medium text-white">
-                      👉 Pour que les touches fonctionnent dans votre jeu, ouvrez l&apos;application sur votre réseau local :{' '}
-                      <span className="font-mono text-cyan-300">http://192.168.50.174:3000</span> (ou <span className="font-mono text-cyan-300">http://localhost:3000</span> sur le PC).
+                      👉 Pour que les touches fonctionnent dans votre jeu, lancez <span className="font-semibold text-cyan-300">DEMARRER_NOVA.bat</span> sur votre PC et ouvrez l&apos;application sur :{' '}
+                      <span className="font-mono text-cyan-300">http://localhost:5005/nova/</span>
                     </p>
                   </div>
                 )}
@@ -1069,7 +1071,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="text"
                     value={bridgeUrl}
                     onChange={(e) => setBridgeUrl(e.target.value)}
-                    placeholder="http://192.168.50.34:5005 ou http://localhost:5005"
+                    placeholder="http://localhost:5005 ou http://127.0.0.1:5005"
                     className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
                   />
                   <button
@@ -1087,7 +1089,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       if (res.success) {
                         alert("✓ Touche 'U' (Démarrage vaisseau) envoyée avec succès au pont PC !");
                       } else {
-                        alert("❌ Échec : le pont clavier n'a pas répondu. Vérifiez que LANCER_PONT_PC.bat tourne sur le PC.");
+                        alert("❌ Échec : le pont clavier n'a pas répondu. Vérifiez que DEMARRER_NOVA.bat tourne sur le PC.");
                       }
                     }}
                     className="px-3 py-2 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 rounded-xl text-xs font-semibold text-cyan-300 transition shrink-0"
@@ -1099,13 +1101,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
                   <div className="font-semibold text-slate-300 flex items-center gap-1">
-                    <span>💡 Comment lancer le pont sur votre PC de jeu :</span>
+                    <span>💡 Comment lancer le pont sur votre PC en 1 clic :</span>
                   </div>
-                  <code className="block font-mono text-[10px] text-cyan-300 bg-black/40 p-1.5 rounded">
-                    python scripts/bridge.py
-                  </code>
+                  <p className="text-[11px] text-slate-300">
+                    Double-cliquez sur <code className="text-cyan-300 font-bold">DEMARRER_NOVA.bat</code> (ou <code className="text-cyan-300 font-bold">Nova-StarCitizen.exe</code>) sur votre PC de jeu.
+                  </p>
                   <p className="text-[10px] text-slate-400">
-                    Nécessite <code className="text-slate-300">pip install pydirectinput</code> pour que DirectX 11/12 dans Star Citizen reçoive les frappes.
+                    La fenêtre s&apos;ouvre automatiquement en Administrateur et votre navigateur web s&apos;ouvre sur le compagnon prêt pour Star Citizen !
                   </p>
                 </div>
               </div>

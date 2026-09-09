@@ -53,6 +53,10 @@ export default function CompanionApp() {
   // Vision écran et flux d'analyse
   const [isVisionActive, setIsVisionActive] = useState(false);
 
+  // État du Pont Clavier PC (Port 5005)
+  const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
+  const [bridgeInfo, setBridgeInfo] = useState<{ url?: string; isAdmin?: boolean; directInput?: boolean } | null>(null);
+
   // États pour le Mode Appel Mains-Libres continu
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [callState, setCallState] = useState<LiveCallState>('listening');
@@ -90,6 +94,32 @@ export default function CompanionApp() {
         console.log('✓ Configuration restaurée depuis le fichier persistant du PC');
       }
     });
+  }, []);
+
+  // Surveillance périodique de l'état de connexion du Pont Clavier PC
+  useEffect(() => {
+    let isMounted = true;
+    const checkBridge = async () => {
+      const res = await macroManager.checkBridgeHealth();
+      if (!isMounted) return;
+      setBridgeConnected(res.online);
+      if (res.online && res.info) {
+        setBridgeInfo({
+          url: res.url,
+          isAdmin: res.info.isAdmin,
+          directInput: res.info.directInput,
+        });
+      } else {
+        setBridgeInfo(null);
+      }
+    };
+
+    checkBridge();
+    const interval = setInterval(checkBridge, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // --- Sauvegarde & Restauration Rapide en 1 Clic ---
@@ -706,6 +736,40 @@ export default function CompanionApp() {
             className="p-2 rounded-xl bg-slate-800/60 hover:bg-red-500/20 hover:border-red-500/40 border border-slate-700/60 text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:hover:bg-slate-800/60 disabled:hover:text-slate-400 disabled:cursor-not-allowed transition"
           >
             <Trash2 className="w-4 h-4" />
+          </button>
+
+          {/* Indicateur d'état du Pont Clavier PC */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold shadow-sm active:scale-95 transition ${
+              bridgeConnected === true
+                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
+                : bridgeConnected === false
+                ? 'bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/40 text-rose-300'
+                : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+            }`}
+            title={
+              bridgeConnected === true
+                ? `✓ Pont Clavier PC Connecté sur ${bridgeInfo?.url || 'Port 5005'}. Vos ordres vocaux actionnent directement les touches dans Star Citizen !`
+                : `⚠️ Pont Clavier Déconnecté. Cliquez pour afficher comment lancer DEMARRER_NOVA.bat sur votre PC.`
+            }
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                bridgeConnected === true
+                  ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
+                  : bridgeConnected === false
+                  ? 'bg-rose-400 animate-pulse'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span className="hidden lg:inline font-mono text-[11px]">
+              {bridgeConnected === true
+                ? 'Pont PC : Prêt'
+                : bridgeConnected === false
+                ? 'Pont PC : Déconnecté'
+                : 'Pont PC...'}
+            </span>
           </button>
 
           {/* Touche Sauvegarde Rapide */}

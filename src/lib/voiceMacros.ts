@@ -213,19 +213,87 @@ export const macroManager = {
   getBridgeUrl(): string {
     if (typeof window === 'undefined') return 'http://localhost:5005';
     const saved = localStorage.getItem(STORAGE_KEY_BRIDGE);
-    if (saved) return saved;
-
-    // Détection automatique intelligente : si exécuté sur localhost, privilégier localhost:5005
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:5005';
+    if (saved && saved.includes('192.168.50.34')) {
+      // Purge automatique de l'ancienne IP fixe de test
+      localStorage.removeItem(STORAGE_KEY_BRIDGE);
+    } else if (saved && saved.trim()) {
+      return saved.trim().replace(/\/$/, '');
     }
-    // Sinon, IP du PC Windows de jeu sur le LAN
-    return 'http://192.168.50.34:5005';
+
+    // Si servi par le pont lui-même sur le port 5005
+    if (window.location.port === '5005') {
+      return window.location.origin;
+    }
+
+    // Détection automatique intelligente : hostname actuel sur port 5005
+    if (window.location.hostname && window.location.hostname !== '') {
+      return `http://${window.location.hostname}:5005`;
+    }
+
+    return 'http://localhost:5005';
   },
 
   setBridgeUrl(url: string): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY_BRIDGE, url.trim().replace(/\/$/, ''));
+    const clean = url.trim().replace(/\/$/, '');
+    if (clean && !clean.includes('192.168.50.34')) {
+      localStorage.setItem(STORAGE_KEY_BRIDGE, clean);
+    }
+  },
+
+  getCandidateUrls(): string[] {
+    const urls: string[] = [];
+    const add = (u?: string | null) => {
+      if (!u) return;
+      const clean = u.trim().replace(/\/$/, '');
+      if (clean && !urls.includes(clean) && !clean.includes('192.168.50.34')) {
+        urls.push(clean);
+      }
+    };
+
+    // 1. Si déjà servi par l'exécutable sur le port 5005 (priorité absolue)
+    if (typeof window !== 'undefined' && window.location.port === '5005') {
+      add(window.location.origin);
+    }
+
+    // 2. URL couramment configurée si valide
+    add(this.getBridgeUrl());
+
+    // 3. Hostname actuel sur le port 5005
+    if (typeof window !== 'undefined' && window.location.hostname) {
+      add(`http://${window.location.hostname}:5005`);
+    }
+
+    // 4. IPv4 Loopback standard
+    add('http://127.0.0.1:5005');
+
+    // 5. Localhost standard
+    add('http://localhost:5005');
+
+    return urls;
+  },
+
+  async checkBridgeHealth(): Promise<{ online: boolean; url?: string; info?: any }> {
+    const candidates = this.getCandidateUrls();
+    for (const url of candidates) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 800);
+        const res = await fetch(`${url}/status`, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const info = await res.json();
+          this.setBridgeUrl(url);
+          return { online: true, url, info };
+        }
+      } catch {
+        // Continuer vers la candidate suivante
+      }
+    }
+    return { online: false };
   },
 
   getMacros(): VoiceMacro[] {
@@ -262,18 +330,12 @@ export const macroManager = {
   },
 
   async sendKeyToBridge(key: string): Promise<{ success: boolean; bridgeUrl: string; error?: string }> {
-    const primaryUrl = this.getBridgeUrl();
-    const candidateUrls = [primaryUrl];
-
-    // Ajouter localhost:5005 comme secours si non présent
-    if (!candidateUrls.includes('http://localhost:5005')) {
-      candidateUrls.push('http://localhost:5005');
-    }
+    const candidateUrls = this.getCandidateUrls();
 
     for (const url of candidateUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1500);
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
 
         const res = await fetch(`${url}/press`, {
           method: 'POST',
@@ -284,6 +346,7 @@ export const macroManager = {
         clearTimeout(timeoutId);
 
         if (res.ok) {
+          this.setBridgeUrl(url);
           return { success: true, bridgeUrl: url };
         }
       } catch (err: any) {
@@ -293,7 +356,7 @@ export const macroManager = {
 
     return {
       success: false,
-      bridgeUrl: primaryUrl,
+      bridgeUrl: candidateUrls[0] || 'http://localhost:5005',
       error: "Le pont clavier n'a pas répondu sur le port 5005.",
     };
   },
@@ -345,7 +408,7 @@ export const macroManager = {
               matched: true,
               macro,
               bridgeSuccess: false,
-              confirmation: `Ordre pour la touche ${macro.key.toUpperCase()} détecté, mais le site HTTPS bloque la connexion à votre PC. Veuillez ouvrir l'application en local sur le port 3000 pour que les touches fonctionnent dans le jeu.`,
+              confirmation: `Ordre pour la touche ${macro.key.toUpperCase()} détecté, mais le site HTTPS en ligne ne peut pas communiquer avec votre PC. Lancez 'DEMARRER_NOVA.bat' ou 'Nova-StarCitizen.exe' sur votre PC pour ouvrir l'application sur le port 5005.`,
             };
           }
 
@@ -358,7 +421,7 @@ export const macroManager = {
               macro,
               bridgeSuccess: false,
               bridgeUrl: result.bridgeUrl,
-              confirmation: `J'ai bien compris l'ordre pour la touche ${macro.key.toUpperCase()}, mais le pont clavier sur votre PC n'est pas connecté. Veuillez lancer bridge.py sur votre PC.`,
+              confirmation: `J'ai bien compris l'ordre pour la touche ${macro.key.toUpperCase()}, mais le pont clavier sur votre PC n'est pas connecté. Veuillez lancer DEMARRER_NOVA.bat sur votre PC.`,
             };
           }
 

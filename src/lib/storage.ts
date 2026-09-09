@@ -141,18 +141,13 @@ export const storage = {
   },
 
   async pushToBridge(customBridgeUrl?: string): Promise<boolean> {
-    const primaryUrl = customBridgeUrl || macroManager.getBridgeUrl();
-    const candidateUrls = [primaryUrl];
-    if (!candidateUrls.includes('http://localhost:5005')) {
-      candidateUrls.push('http://localhost:5005');
-    }
-
+    const candidateUrls = customBridgeUrl ? [customBridgeUrl] : macroManager.getCandidateUrls();
     const payload = this.exportFullConfig();
 
     for (const url of candidateUrls) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2000);
+        const timeout = setTimeout(() => controller.abort(), 1500);
         const res = await fetch(`${url}/config`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -161,6 +156,7 @@ export const storage = {
         });
         clearTimeout(timeout);
         if (res.ok) {
+          macroManager.setBridgeUrl(url);
           return true;
         }
       } catch {
@@ -171,21 +167,18 @@ export const storage = {
   },
 
   async syncWithBridge(customBridgeUrl?: string): Promise<{ synced: boolean; config?: FullNovaConfig }> {
-    const primaryUrl = customBridgeUrl || macroManager.getBridgeUrl();
-    const candidateUrls = [primaryUrl];
-    if (!candidateUrls.includes('http://localhost:5005')) {
-      candidateUrls.push('http://localhost:5005');
-    }
+    const candidateUrls = customBridgeUrl ? [customBridgeUrl] : macroManager.getCandidateUrls();
 
     for (const url of candidateUrls) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2000);
+        const timeout = setTimeout(() => controller.abort(), 1500);
         const res = await fetch(`${url}/config`, { signal: controller.signal });
         clearTimeout(timeout);
 
         if (res.ok) {
           const remote = await res.json();
+          macroManager.setBridgeUrl(url);
           // Si le fichier sur le PC contient déjà des configurations
           if (remote && (remote.profile || remote.macros || remote.apiKey || remote.memories)) {
             this.importFullConfig(remote);

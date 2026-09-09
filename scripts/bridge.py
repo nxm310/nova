@@ -13,25 +13,46 @@ import os
 import sys
 import json
 import time
+import socket
 import threading
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 PORT = 5005
 
-# Déterminer le dossier des fichiers statiques de l'application (out)
-if getattr(sys, 'frozen', False):
-    # Mode binaire autonome PyInstaller (.exe)
-    BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-    OUT_DIR = os.path.join(BASE_DIR, 'out')
-else:
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    OUT_DIR = os.path.join(BASE_DIR, 'out')
+def find_out_dir() -> str:
+    """Détermine le dossier des fichiers statiques exportés de l'application."""
+    candidates = []
+    if getattr(sys, 'frozen', False):
+        # Mode binaire autonome PyInstaller (.exe)
+        exe_dir = os.path.dirname(sys.executable)
+        meipass = getattr(sys, '_MEIPASS', None)
+        if meipass:
+            candidates.append(os.path.join(meipass, 'out'))
+            candidates.append(meipass)
+        candidates.append(os.path.join(exe_dir, 'out'))
+        candidates.append(os.path.join(exe_dir, '_internal', 'out'))
+    else:
+        # Mode script Python direct
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidates.append(os.path.join(base_dir, 'out'))
+        candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out'))
+        candidates.append(os.path.join(os.getcwd(), 'out'))
 
-if not os.path.exists(OUT_DIR):
-    alt = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out')
-    if os.path.exists(alt):
-        OUT_DIR = alt
+    # Priorité 1 : candidat contenant index.html
+    for c in candidates:
+        if os.path.exists(c) and os.path.isdir(c) and os.path.exists(os.path.join(c, 'index.html')):
+            return c
+
+    # Priorité 2 : premier dossier candidat existant
+    for c in candidates:
+        if os.path.exists(c) and os.path.isdir(c):
+            return c
+
+    return candidates[0] if candidates else os.path.join(os.getcwd(), 'out')
+
+OUT_DIR = find_out_dir()
+BASE_DIR = os.path.dirname(OUT_DIR)
 
 # Détection des modules d'injection clavier
 has_directinput = False
@@ -348,7 +369,8 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
     def _send_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -457,25 +479,45 @@ def open_browser():
 
 
 def run():
-    server = HTTPServer(("0.0.0.0", PORT), UnifiedCompanionHandler)
     admin_ok = is_admin_windows()
 
     print("=" * 68)
     print(f"🚀 NOVA — COMPAGNON STAR CITIZEN TOUT-EN-UN (PORT {PORT})")
     print("=" * 68)
     print(f"  ✓ Application & Pont clavier disponibles sur : http://localhost:{PORT}/nova/")
-    print(f"  ✓ Ouverture automatique de votre navigateur...")
-    print(f"  ✓ Commandes Star Citizen (U, R, N, ALT+N, B, L, P, C, K, etc.)")
-    print(f"  ✓ Configurations conservées dans : {get_persistent_config_path()}")
+    print(f"  ✓ Dossier des fichiers web : {OUT_DIR}")
+    print(f"  ✓ Frappes DirectInput Star Citizen : {'ACTIF (180ms)' if (has_directinput or is_windows) else 'SIMULATION'}")
     if is_windows:
         if admin_ok:
-            print("  ✓ Privilèges Administrateur : ACTIFS (Star Citizen peut recevoir les touches)")
+            print("  ✓ Privilèges Administrateur : ACTIFS (Star Citizen débloqué)")
         else:
-            print("  ⚠️ ATTENTION : Privilèges Administrateur NON DÉTECTÉS !")
+            print("  ⚠️ ATTENTION : Droits Administrateur NON DÉTECTÉS !")
             print("     Star Citizen bloque les touches si le script n'est pas Administrateur.")
             print("     👉 Relancez via 'DEMARRER_NOVA.bat' ou Clic droit > Exécuter en tant qu'administrateur.")
-    print("  ✓ Gardez simplement cette fenêtre ouverte pendant votre session de jeu !")
+    print(f"  ✓ Configurations conservées dans : {get_persistent_config_path()}")
+    print("-" * 68)
+    print("  💡 Gardez cette fenêtre ouverte en arrière-plan pendant votre jeu !")
     print("=" * 68)
+
+    # Démarrage du serveur web et pont (DualStack IPv4/IPv6 avec repli IPv4)
+    server = None
+    try:
+        class DualStackServer(HTTPServer):
+            address_family = socket.AF_INET6
+            def server_bind(self):
+                try:
+                    self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                except Exception:
+                    pass
+                super().server_bind()
+
+        server = DualStackServer(("", PORT), UnifiedCompanionHandler)
+    except Exception:
+        try:
+            server = HTTPServer(("0.0.0.0", PORT), UnifiedCompanionHandler)
+        except Exception as err:
+            print(f"[ERREUR FATALE] Impossible de démarrer le serveur sur le port {PORT}: {err}")
+            return
 
     threading.Thread(target=open_browser, daemon=True).start()
 
