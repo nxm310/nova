@@ -36,6 +36,11 @@ import {
   EyeOff,
   Save,
   FolderOpen,
+  RefreshCw,
+  Download,
+  AlertTriangle,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function CompanionApp() {
@@ -56,6 +61,21 @@ export default function CompanionApp() {
   // État du Pont Clavier PC (Port 5005)
   const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
   const [bridgeInfo, setBridgeInfo] = useState<{ url?: string; isAdmin?: boolean; directInput?: boolean } | null>(null);
+
+  // États de la Mise à Jour Automatique 1-Clic
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateApplying, setUpdateApplying] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{
+    success?: boolean;
+    hasUpdate?: boolean;
+    currentVersion?: string;
+    latestVersion?: string;
+    notes?: string;
+    downloadUrl?: string;
+    error?: string;
+  } | null>(null);
+  const [updateToast, setUpdateToast] = useState<string | null>(null);
 
   // États pour le Mode Appel Mains-Libres continu
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
@@ -169,6 +189,76 @@ export default function CompanionApp() {
     e.target.value = '';
   };
 
+  // --- Mise à Jour Automatique 1-Clic ---
+  const handleCheckUpdate = async () => {
+    setIsUpdateModalOpen(true);
+    setUpdateChecking(true);
+    setUpdateToast(null);
+    try {
+      const bridgeUrl = macroManager.getBridgeUrl();
+      const res = await fetch(`${bridgeUrl}/update/check`);
+      if (res.ok) {
+        const data = await res.json();
+        setUpdateInfo(data);
+      } else {
+        // Repli direct sur l'API GitHub Releases depuis le navigateur
+        const ghRes = await fetch('https://api.github.com/repos/nxm310/nova/releases/latest');
+        if (ghRes.ok) {
+          const ghData = await ghRes.json();
+          const tag = ghData.tag_name || 'v1.0.0';
+          let dlUrl = '';
+          for (const a of ghData.assets || []) {
+            if (a.name?.endsWith('.zip')) {
+              dlUrl = a.browser_download_url;
+              break;
+            }
+          }
+          setUpdateInfo({
+            success: true,
+            hasUpdate: tag !== 'v1.0.1' && tag !== '1.0.1',
+            currentVersion: '1.0.1',
+            latestVersion: tag,
+            notes: ghData.body || '',
+            downloadUrl: dlUrl || 'https://github.com/nxm310/nova/releases/download/v1.0.0/Nova-StarCitizen-Windows.zip',
+          });
+        } else {
+          setUpdateInfo({ error: "Impossible de joindre le serveur de mise à jour GitHub." });
+        }
+      }
+    } catch (err: any) {
+      setUpdateInfo({ error: "Erreur de vérification des mises à jour : " + (err?.message || err) });
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!updateInfo?.downloadUrl) return;
+    setUpdateApplying(true);
+    setUpdateToast(null);
+    try {
+      const bridgeUrl = macroManager.getBridgeUrl();
+      const res = await fetch(`${bridgeUrl}/update/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ downloadUrl: updateInfo.downloadUrl }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUpdateToast("✓ Mise à jour appliquée avec succès ! Rechargement en cours...");
+        setTimeout(() => {
+          window.location.reload();
+        }, 2200);
+      } else {
+        alert("Erreur lors de la mise à jour : " + (data.error || 'Échec'));
+      }
+    } catch (err: any) {
+      alert("Le pont PC n'a pas répondu pour la mise à jour : " + err.message);
+    } finally {
+      setUpdateApplying(false);
+    }
+  };
+
   // Raccourci clavier universel Ctrl+S pour sauvegarder en 1 seconde
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -216,17 +306,27 @@ export default function CompanionApp() {
     setIsPlayingAudio(true);
     if (messageId) setPlayingMessageId(messageId);
 
-    const onEnd = () => {
+    let hasEnded = false;
+    const safeEnd = () => {
+      if (hasEnded) return;
+      hasEnded = true;
+      clearTimeout(watchdogTimer);
       setIsPlayingAudio(false);
       setPlayingMessageId(null);
       if (onComplete) onComplete();
     };
 
+    // Watchdog de sécurité : durée estimée + 2.5 secondes de marge
+    // Garantit que l'écoute du micro repart toujours même en arrière-plan
+    const estimatedMs = Math.max(3000, (cleanText.length / 8) * 1000 + 2500);
+    const watchdogTimer = setTimeout(() => {
+      safeEnd();
+    }, estimatedMs);
+
+    const onEnd = () => safeEnd();
     const onError = (e: any) => {
       console.warn('Erreur lecture audio:', e);
-      setIsPlayingAudio(false);
-      setPlayingMessageId(null);
-      if (onComplete) onComplete();
+      safeEnd();
     };
 
     // 1. Web Speech API (Siri / Voix système)
@@ -414,23 +514,33 @@ export default function CompanionApp() {
         imageBase64,
       });
 
+      // Détection et déclenchement des actions Star Citizen de l'IA via le pont clavier
+      const actionMatch = botReply.match(/\[ACTION:KEY:([a-zA-Z0-9+_]+)\]/i);
+      let displayReply = botReply;
+      if (actionMatch) {
+        const keyToPress = actionMatch[1];
+        displayReply = botReply.replace(/\[ACTION:KEY:[a-zA-Z0-9+_]+\]/gi, '').trim();
+        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] ➔ Envoi au pont PC...`);
+        macroManager.sendKeyToBridge(keyToPress);
+      }
+
       const botMessage: ChatMessage = {
         id: 'msg_' + Date.now() + '_a',
         role: 'assistant',
-        content: botReply,
+        content: displayReply,
         timestamp: Date.now(),
       };
 
       const finalHistory = [...newHistory, botMessage];
       updateMessages(finalHistory);
       messagesRef.current = finalHistory;
-      setLastReply(botReply);
+      setLastReply(displayReply);
 
       if (!isCallActiveRef.current) return;
 
       setCallState('speaking');
 
-      playSpeech(botReply, botMessage.id, () => {
+      playSpeech(displayReply, botMessage.id, () => {
         // Une fois la lecture audio finie : relancer automatiquement l'écoute !
         if (isCallActiveRef.current) {
           setLiveTranscript('');
@@ -545,10 +655,20 @@ export default function CompanionApp() {
         imageBase64,
       });
 
+      // Détection et exécution des actions Star Citizen de l'IA via le pont clavier
+      const actionMatch = botReply.match(/\[ACTION:KEY:([a-zA-Z0-9+_]+)\]/i);
+      let displayReply = botReply;
+      if (actionMatch) {
+        const keyToPress = actionMatch[1];
+        displayReply = botReply.replace(/\[ACTION:KEY:[a-zA-Z0-9+_]+\]/gi, '').trim();
+        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] ➔ Envoi au pont PC...`);
+        macroManager.sendKeyToBridge(keyToPress);
+      }
+
       const botMessage: ChatMessage = {
         id: 'msg_' + Date.now() + '_a',
         role: 'assistant',
-        content: botReply,
+        content: displayReply,
         timestamp: Date.now(),
       };
 
@@ -557,7 +677,7 @@ export default function CompanionApp() {
 
       // Si la lecture automatique est activée, prononcer la réponse
       if (profile.autoPlayVoice) {
-        playSpeech(botReply, botMessage.id);
+        playSpeech(displayReply, botMessage.id);
       }
     } catch (err: any) {
       console.warn('Chat error:', err?.message || err);
@@ -797,6 +917,16 @@ export default function CompanionApp() {
             />
           </label>
 
+          {/* Touche Mise à Jour Automatique 1-Clic */}
+          <button
+            onClick={handleCheckUpdate}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 text-xs font-semibold shadow-sm active:scale-95 transition"
+            title="Rechercher et installer les mises à jour sans réinstaller"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-300 ${updateChecking ? 'animate-spin' : ''}`} />
+            <span className="hidden md:inline">Mise à jour</span>
+          </button>
+
           {/* Bouton Paramètres */}
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -813,6 +943,14 @@ export default function CompanionApp() {
         <div className="fixed top-20 right-5 z-50 animate-fade-in bg-purple-950/95 text-purple-100 border border-purple-500 px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 backdrop-blur-md">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>✓ Réglages sauvegardés dans votre dossier Téléchargements !</span>
+        </div>
+      )}
+
+      {/* Toast de confirmation de mise à jour */}
+      {updateToast && (
+        <div className="fixed top-20 right-5 z-50 animate-fade-in bg-blue-950/95 text-blue-100 border border-blue-500 px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 backdrop-blur-md">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{updateToast}</span>
         </div>
       )}
 
@@ -1036,6 +1174,154 @@ export default function CompanionApp() {
         isVisionActive={isVisionActive}
         onToggleVision={handleToggleVision}
       />
+
+      {/* Modal de Mise à Jour 1-Clic */}
+      {isUpdateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <RefreshCw className={`w-5 h-5 ${updateChecking || updateApplying ? 'animate-spin' : ''}`} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Mise à Jour Nova</h3>
+                  <p className="text-xs text-slate-400">Mettre à jour le système en 1 clic sans réinstallation</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsUpdateModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Fermer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              {updateChecking ? (
+                <div className="py-12 flex flex-col items-center justify-center space-y-3 text-center">
+                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                  <p className="text-sm text-slate-300 font-medium">Recherche des mises à jour sur GitHub...</p>
+                  <p className="text-xs text-slate-500">Connexion au dépôt officiel nxm310/nova</p>
+                </div>
+              ) : updateInfo?.error ? (
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3 text-rose-300 text-xs leading-relaxed">
+                    <AlertTriangle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
+                    <div>
+                      <span className="font-semibold block mb-1">Erreur de vérification</span>
+                      {updateInfo.error}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-2">
+                    <button
+                      onClick={handleCheckUpdate}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md active:scale-95 transition"
+                    >
+                      Réessayer
+                    </button>
+                    <a
+                      href="https://github.com/nxm310/nova/releases"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 underline"
+                    >
+                      <span>Voir sur GitHub</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              ) : updateInfo?.hasUpdate ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="text-sm font-semibold text-white flex items-center gap-2">
+                        <span>Nouvelle mise à jour disponible !</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-mono border border-emerald-500/40">
+                          {updateInfo.latestVersion}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        Version actuelle installée : <span className="font-mono text-slate-300">{updateInfo.currentVersion || 'v1.0.1'}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {updateInfo.notes && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Nouveautés :</label>
+                      <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs text-slate-300 font-mono whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed">
+                        {updateInfo.notes}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300/90 leading-relaxed flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Vos configurations (touches de commandes, clé API, profil) sont préservées automatiquement.</span>
+                  </div>
+
+                  <div className="pt-2 space-y-2">
+                    <button
+                      onClick={handleApplyUpdate}
+                      disabled={updateApplying}
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait active:scale-[0.99] transition"
+                    >
+                      {updateApplying ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Mise à jour en cours (téléchargement et installation)...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          <span>Installer la mise à jour maintenant (1-Clic)</span>
+                        </>
+                      )}
+                    </button>
+
+                    {updateInfo.downloadUrl && (
+                      <div className="text-center pt-1">
+                        <a
+                          href={updateInfo.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] text-slate-400 hover:text-slate-200 underline inline-flex items-center gap-1"
+                        >
+                          <span>Ou télécharger directement le .zip depuis GitHub</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                    <Check className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-white">Votre Nova est à jour !</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Vous disposez de la version la plus récente ({updateInfo?.currentVersion || 'v1.0.1'}).
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCheckUpdate}
+                    className="mt-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition"
+                  >
+                    Vérifier à nouveau
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

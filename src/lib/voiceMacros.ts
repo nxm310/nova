@@ -76,11 +76,20 @@ export const DEFAULT_VOICE_MACROS: VoiceMacro[] = [
     phrases: [
       "train d'atterrissage",
       "train datterrissage",
+      "train atterrissage",
       "sort le train",
-      "rentre le train",
-      "atterrissage",
       "sortir le train",
+      "sort le train d'atterrissage",
+      "sortir le train d'atterrissage",
+      "rentre le train",
       "rentrer le train",
+      "rentre le train d'atterrissage",
+      "rentrer le train d'atterrissage",
+      "rentre les trains",
+      "baisse le train",
+      "remonte le train",
+      "atterrissage",
+      "le train",
     ],
     key: 'n',
     confirmation: "Train d'atterrissage actionné, Commandant.",
@@ -98,6 +107,8 @@ export const DEFAULT_VOICE_MACROS: VoiceMacro[] = [
       "autorise atterrissage",
       "demande atterrissage",
       "contact la tour",
+      "appeler la tour",
+      "demande atterrissage tour",
     ],
     key: 'alt+n',
     confirmation: "Demande d'atterrissage transmise à la tour de contrôle.",
@@ -150,10 +161,26 @@ export const DEFAULT_VOICE_MACROS: VoiceMacro[] = [
     name: 'Phares / Éclairage Vaisseau',
     phrases: [
       'allume les phares',
+      'allumer les phares',
+      'allume les feux',
+      'allumer les feux',
+      'allume la lumiere',
+      'allume les lumieres',
+      'active les phares',
+      'mets les phares',
+      'met les phares',
       'eteins les phares',
+      'eteindre les phares',
+      'eteins les feux',
+      'coupe les phares',
+      'coupe les feux',
+      'les phares',
+      'les feux',
       'phares',
       'lumieres',
-      'active les phares',
+      'lumiere',
+      'projecteurs',
+      'eclairage',
     ],
     key: 'l',
     confirmation: 'Éclairage extérieur basculé.',
@@ -306,13 +333,21 @@ export const macroManager = {
         return DEFAULT_VOICE_MACROS;
       }
 
-      // Fusionner les nouvelles macros par défaut sans écraser les modifications de l'utilisateur
-      const existingIds = new Set(parsed.map((m) => m.id));
+      // Fusionner les nouvelles macros et les nouveaux synonymes sans écraser les modifications de l'utilisateur
       let updated = false;
       for (const def of DEFAULT_VOICE_MACROS) {
-        if (!existingIds.has(def.id)) {
+        const existing = parsed.find((m) => m.id === def.id);
+        if (!existing) {
           parsed.push(def);
           updated = true;
+        } else {
+          const phraseSet = new Set(existing.phrases.map((p) => p.toLowerCase().trim()));
+          for (const phrase of def.phrases) {
+            if (!phraseSet.has(phrase.toLowerCase().trim())) {
+              existing.phrases.push(phrase);
+              updated = true;
+            }
+          }
         }
       }
       if (updated) {

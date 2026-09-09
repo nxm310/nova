@@ -14,11 +14,19 @@ import sys
 import json
 import time
 import socket
+import shutil
+import zipfile
 import threading
 import webbrowser
+import urllib.request
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+try:
+    from http.server import ThreadingHTTPServer
+except ImportError:
+    ThreadingHTTPServer = HTTPServer
 
 PORT = 5005
+CURRENT_VERSION = "1.0.1"
 
 def find_out_dir() -> str:
     """Détermine le dossier des fichiers statiques exportés de l'application."""
@@ -129,7 +137,7 @@ def is_admin_windows() -> bool:
         return False
 
 def ensure_star_citizen_focus():
-    """Tente de donner le focus à Star Citizen s'il est en arrière-plan."""
+    """Restaure Star Citizen s'il est minimisé sans perturber le micro du navigateur."""
     if not is_windows:
         return
     try:
@@ -138,10 +146,8 @@ def ensure_star_citizen_focus():
         if not hwnd:
             hwnd = ctypes.windll.user32.FindWindowA(b"CryENGINE", None)
         if hwnd:
-            fg = ctypes.windll.user32.GetForegroundWindow()
-            if fg != hwnd:
+            if ctypes.windll.user32.IsIconic(hwnd):
                 ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-                ctypes.windll.user32.SetForegroundWindow(hwnd)
                 time.sleep(0.04)
     except Exception:
         pass
@@ -357,10 +363,86 @@ def save_persistent_config(data: dict) -> bool:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         print(f"💾 [CONFIG] Configuration utilisateur persistée : {config_path}")
-        return True
     except Exception as e:
         print(f"[CONFIG] Erreur écriture {config_path}: {e}")
         return False
+
+def check_github_update() -> dict:
+    """Vérifie si une mise à jour est disponible sur GitHub Releases."""
+    api_url = "https://api.github.com/repos/nxm310/nova/releases/latest"
+    try:
+        req = urllib.request.Request(
+            api_url,
+            headers={"User-Agent": "Nova-Companion-Updater", "Accept": "application/vnd.github.v3+json"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode("utf-8"))
+                tag = data.get("tag_name", "v1.0.0")
+                body = data.get("body", "")
+                download_url = ""
+                for asset in data.get("assets", []):
+                    if asset.get("name", "").endswith(".zip"):
+                        download_url = asset.get("browser_download_url")
+                        break
+                if not download_url:
+                    download_url = "https://github.com/nxm310/nova/releases/download/v1.0.0/Nova-StarCitizen-Windows.zip"
+
+                return {
+                    "success": True,
+                    "currentVersion": CURRENT_VERSION,
+                    "latestVersion": tag,
+                    "hasUpdate": tag.lstrip('v') != CURRENT_VERSION.lstrip('v'),
+                    "notes": body,
+                    "downloadUrl": download_url,
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "currentVersion": CURRENT_VERSION,
+            "error": str(e),
+            "hasUpdate": False
+        }
+    return {"success": False, "hasUpdate": False}
+
+def apply_github_update(download_url: str = "") -> dict:
+    """Télécharge la mise à jour depuis GitHub et extrait les nouveaux fichiers."""
+    if not download_url:
+        download_url = "https://github.com/nxm310/nova/releases/download/v1.0.0/Nova-StarCitizen-Windows.zip"
+
+    temp_zip = os.path.join(BASE_DIR, "nova_update_temp.zip")
+    try:
+        print(f"📥 [MISE À JOUR] Téléchargement depuis {download_url}...")
+        req = urllib.request.Request(download_url, headers={"User-Agent": "Nova-Companion-Updater"})
+        with urllib.request.urlopen(req, timeout=45) as response, open(temp_zip, 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)
+
+        print("📦 [MISE À JOUR] Extraction des nouveaux fichiers...")
+        with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
+            for member in zip_ref.namelist():
+                if member.startswith("/") or ".." in member:
+                    continue
+                target_path = os.path.join(BASE_DIR, member)
+                if member.endswith('/'):
+                    os.makedirs(target_path, exist_ok=True)
+                else:
+                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                    with zip_ref.open(member) as src, open(target_path, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
+
+        if os.path.exists(temp_zip):
+            os.remove(temp_zip)
+
+        print("✓ [MISE À JOUR] Mise à jour appliquée avec succès !")
+        return {"success": True, "message": "Mise à jour installée avec succès !"}
+    except Exception as e:
+        print(f"❌ [MISE À JOUR] Erreur : {e}")
+        if os.path.exists(temp_zip):
+            try:
+                os.remove(temp_zip)
+            except Exception:
+                pass
+        return {"success": False, "error": str(e)}
 
 class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -418,6 +500,15 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(cfg).encode("utf-8"))
             return
 
+        if clean in ('/update/check', '/nova/update/check'):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            info = check_github_update()
+            self.wfile.write(json.dumps(info).encode("utf-8"))
+            return
+
         if clean in ('', '/'):
             self.send_response(302)
             self.send_header('Location', '/nova/')
@@ -461,6 +552,23 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"[CONFIG ERREUR] {e}")
 
+        if clean in ('/update/apply', '/nova/update/apply'):
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            dl_url = ""
+            try:
+                data = json.loads(body.decode("utf-8"))
+                dl_url = data.get("downloadUrl", "")
+            except Exception:
+                pass
+            res = apply_github_update(dl_url)
+            self.send_response(200 if res.get("success") else 500)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+
         self.send_response(400)
         self._send_cors()
         self.end_headers()
@@ -482,7 +590,7 @@ def run():
     admin_ok = is_admin_windows()
 
     print("=" * 68)
-    print(f"🚀 NOVA — COMPAGNON STAR CITIZEN TOUT-EN-UN (PORT {PORT})")
+    print(f"🚀 NOVA — COMPAGNON STAR CITIZEN TOUT-EN-UN (PORT {PORT}) v{CURRENT_VERSION}")
     print("=" * 68)
     print(f"  ✓ Application & Pont clavier disponibles sur : http://localhost:{PORT}/nova/")
     print(f"  ✓ Dossier des fichiers web : {OUT_DIR}")
@@ -499,11 +607,12 @@ def run():
     print("  💡 Gardez cette fenêtre ouverte en arrière-plan pendant votre jeu !")
     print("=" * 68)
 
-    # Démarrage du serveur web et pont (DualStack IPv4/IPv6 avec repli IPv4)
+    # Démarrage du serveur web multi-thread (DualStack IPv4/IPv6 avec repli IPv4)
     server = None
     try:
-        class DualStackServer(HTTPServer):
+        class DualStackThreadingServer(ThreadingHTTPServer):
             address_family = socket.AF_INET6
+            daemon_threads = True
             def server_bind(self):
                 try:
                     self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -511,13 +620,17 @@ def run():
                     pass
                 super().server_bind()
 
-        server = DualStackServer(("", PORT), UnifiedCompanionHandler)
+        server = DualStackThreadingServer(("", PORT), UnifiedCompanionHandler)
     except Exception:
         try:
-            server = HTTPServer(("0.0.0.0", PORT), UnifiedCompanionHandler)
-        except Exception as err:
-            print(f"[ERREUR FATALE] Impossible de démarrer le serveur sur le port {PORT}: {err}")
-            return
+            server = ThreadingHTTPServer(("0.0.0.0", PORT), UnifiedCompanionHandler)
+            server.daemon_threads = True
+        except Exception:
+            try:
+                server = HTTPServer(("0.0.0.0", PORT), UnifiedCompanionHandler)
+            except Exception as err:
+                print(f"[ERREUR FATALE] Impossible de démarrer le serveur sur le port {PORT}: {err}")
+                return
 
     threading.Thread(target=open_browser, daemon=True).start()
 

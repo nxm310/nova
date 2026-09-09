@@ -57,19 +57,20 @@ jobs:
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "v1.0.0"
-          name: "Nova Star Citizen v1.0.0 (Exécutable Windows)"
+          tag_name: "v1.0.1"
+          name: "Nova Star Citizen v1.0.1 (Exécutable Windows)"
           body: |
-            # 🚀 Nova — Compagnon Star Citizen (Exécutable Windows Tout-en-un)
+            # 🚀 Nova v1.0.1 — Compagnon Star Citizen (Exécutable Windows Tout-en-un)
+
+            ### ✨ Nouveautés de la version 1.0.1 :
+            * **🔄 Bouton Mise à Jour 1-Clic** : Plus besoin de tout réinstaller manuellement ! Cliquez simplement sur "Mise à jour" dans le menu pour appliquer les nouveaux correctifs.
+            * **💾 Sauvegarde automatique et persistante** : Toutes vos touches et configurations sont stockées en permanence dans `%APPDATA%\Nova\nova_config.json` et ne sont jamais écrasées par les mises à jour.
+            * **🎙️ Conversation vocale continue fluide** : Correction du blocage du pont après 1 phrase. Le serveur bridge est désormais multi-thread avec un watchdog audio automatique.
+            * **⚡ Déclenchement automatique des commandes du cockpit** : Gemini active directement les touches du jeu en réponse naturelle (`[ACTION:KEY:<key>]`).
+            * **🚀 Enrichissement des ordres vocaux** : Reconnaissance naturelle de toutes les variantes ("allume les phares", "allumer les phares", "éteins les feux", "rentrer le train d'atterrissage", etc.).
 
             ### Pour lancer le compagnon :
             1. Téléchargez le fichier **`Nova-StarCitizen-Windows.zip`** ci-dessous.
             2. Dézippez-le dans un dossier sur votre PC de jeu.
             3. Double-cliquez sur **`Nova-StarCitizen.exe`** !
-            
-            ### ✨ Ce qui est inclus :
-            * **Zéro installation** : pas besoin de Node.js, d'outils compliqués ou de terminal.
-            * **Ouverture automatique** de votre navigateur web sur l'application.
-            * **Contrôle vocal direct** avec frappe de touches DirectInput dans Star Citizen (`U` pour démarrer le vaisseau, `N` pour le train, `B` pour le quantum, `L` pour les phares...).
-            * **Vision d'écran IA Gemini** (analyse de votre cockpit ou environnement en jeu).
           files: Nova-StarCitizen-Windows.zip
