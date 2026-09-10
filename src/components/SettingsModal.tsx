@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { macroManager, VoiceMacro, DEFAULT_VOICE_MACROS } from '@/lib/voiceMacros';
 import { geminiClient } from '@/lib/geminiClient';
+import { APP_VERSION } from '@/lib/version';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -465,6 +466,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <span>⚙️</span> Paramètres de ton Compagnon
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
+              v{APP_VERSION}
+            </span>
           </h2>
           <button
             onClick={() => {

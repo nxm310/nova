@@ -18,6 +18,7 @@ import shutil
 import zipfile
 import threading
 import webbrowser
+import subprocess
 import urllib.request
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 try:
@@ -26,7 +27,7 @@ except ImportError:
     ThreadingHTTPServer = HTTPServer
 
 PORT = 5005
-CURRENT_VERSION = "1.0.1"
+CURRENT_VERSION = "1.0.2"
 
 def find_out_dir() -> str:
     """Détermine le dossier des fichiers statiques exportés de l'application."""
@@ -372,47 +373,104 @@ def save_persistent_config(data: dict) -> bool:
         return False
 
 def check_github_update() -> dict:
-    """Vérifie si une mise à jour est disponible sur GitHub Releases."""
-    api_url = "https://api.github.com/repos/nxm310/nova/releases/latest"
+    """Vérifie si une mise à jour est disponible sur GitHub Releases et Commits."""
+    api_release = "https://api.github.com/repos/nxm310/nova/releases/latest"
+    api_commits = "https://api.github.com/repos/nxm310/nova/commits/main"
+
+    commit_info = {}
+    local_commit = ""
+
+    # 1. Vérifier si un dépôt Git local existe et récupérer son commit
+    git_dir = os.path.join(BASE_DIR, ".git")
+    if os.path.exists(git_dir):
+        try:
+            res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                local_commit = res.stdout.strip()
+        except Exception:
+            pass
+
+    # 2. Récupérer le dernier commit sur GitHub
     try:
-        req = urllib.request.Request(
-            api_url,
+        req_commit = urllib.request.Request(
+            api_commits,
             headers={"User-Agent": "Nova-Companion-Updater", "Accept": "application/vnd.github.v3+json"}
         )
-        with urllib.request.urlopen(req, timeout=5) as res:
+        with urllib.request.urlopen(req_commit, timeout=5) as res:
             if res.status == 200:
-                data = json.loads(res.read().decode("utf-8"))
-                tag = data.get("tag_name", "v1.0.0")
-                body = data.get("body", "")
-                download_url = ""
-                for asset in data.get("assets", []):
+                c_data = json.loads(res.read().decode("utf-8"))
+                commit_info = {
+                    "sha": c_data.get("sha", "")[:7],
+                    "fullSha": c_data.get("sha", ""),
+                    "message": c_data.get("commit", {}).get("message", ""),
+                    "author": c_data.get("commit", {}).get("author", {}).get("name", ""),
+                    "date": c_data.get("commit", {}).get("author", {}).get("date", ""),
+                    "url": c_data.get("html_url", ""),
+                }
+    except Exception as ce:
+        print(f"[MISE À JOUR] Info commit distant non disponible : {ce}")
+
+    # 3. Récupérer la dernière release GitHub
+    tag = ""
+    notes = ""
+    download_url = ""
+    try:
+        req_rel = urllib.request.Request(
+            api_release,
+            headers={"User-Agent": "Nova-Companion-Updater", "Accept": "application/vnd.github.v3+json"}
+        )
+        with urllib.request.urlopen(req_rel, timeout=5) as res:
+            if res.status == 200:
+                r_data = json.loads(res.read().decode("utf-8"))
+                tag = r_data.get("tag_name", "v1.0.0")
+                notes = r_data.get("body", "")
+                for asset in r_data.get("assets", []):
                     if asset.get("name", "").endswith(".zip"):
                         download_url = asset.get("browser_download_url")
                         break
-                if not download_url:
-                    download_url = "https://github.com/nxm310/nova/releases/download/v1.0.0/Nova-StarCitizen-Windows.zip"
+    except Exception as re:
+        print(f"[MISE À JOUR] Info release distante non disponible : {re}")
 
-                return {
-                    "success": True,
-                    "currentVersion": CURRENT_VERSION,
-                    "latestVersion": tag,
-                    "hasUpdate": tag.lstrip('v') != CURRENT_VERSION.lstrip('v'),
-                    "notes": body,
-                    "downloadUrl": download_url,
-                }
-    except Exception as e:
-        return {
-            "success": False,
-            "currentVersion": CURRENT_VERSION,
-            "error": str(e),
-            "hasUpdate": False
-        }
-    return {"success": False, "hasUpdate": False}
+    if not download_url:
+        download_url = "https://github.com/nxm310/nova/releases/download/v1.0.1/Nova-StarCitizen-Windows.zip"
+
+    # Comparaison de version / commit
+    remote_version = tag.lstrip('v') if tag else CURRENT_VERSION
+    has_update = False
+
+    if local_commit and commit_info.get("fullSha"):
+        has_update = (local_commit != commit_info["fullSha"])
+    elif tag:
+        has_update = (remote_version != CURRENT_VERSION)
+
+    return {
+        "success": True,
+        "currentVersion": CURRENT_VERSION,
+        "latestVersion": remote_version,
+        "hasUpdate": has_update,
+        "notes": notes or commit_info.get("message", ""),
+        "downloadUrl": download_url,
+        "commit": commit_info,
+        "localCommit": local_commit[:7] if local_commit else ""
+    }
 
 def apply_github_update(download_url: str = "") -> dict:
-    """Télécharge la mise à jour depuis GitHub et extrait les nouveaux fichiers."""
+    """Télécharge la mise à jour depuis GitHub ou exécute git pull."""
+    git_dir = os.path.join(BASE_DIR, ".git")
+    if os.path.exists(git_dir):
+        try:
+            print("🔄 [MISE À JOUR] Dépôt Git local détecté. Exécution de 'git pull'...")
+            proc = subprocess.run(["git", "pull", "origin", "main"], cwd=BASE_DIR, capture_output=True, text=True, timeout=25)
+            if proc.returncode == 0:
+                print(f"✓ [MISE À JOUR] git pull réussi : {proc.stdout.strip()}")
+                return {"success": True, "message": f"Mise à jour Git appliquée avec succès ! ({proc.stdout.strip()})"}
+            else:
+                print(f"⚠️ [MISE À JOUR] git pull a échoué ({proc.stderr.strip()}), repli sur ZIP...")
+        except Exception as ge:
+            print(f"⚠️ [MISE À JOUR] git non disponible ({ge}), repli sur ZIP...")
+
     if not download_url:
-        download_url = "https://github.com/nxm310/nova/releases/download/v1.0.0/Nova-StarCitizen-Windows.zip"
+        download_url = "https://github.com/nxm310/nova/releases/download/v1.0.1/Nova-StarCitizen-Windows.zip"
 
     temp_zip = os.path.join(BASE_DIR, "nova_update_temp.zip")
     try:
@@ -437,8 +495,8 @@ def apply_github_update(download_url: str = "") -> dict:
         if os.path.exists(temp_zip):
             os.remove(temp_zip)
 
-        print("✓ [MISE À JOUR] Mise à jour appliquée avec succès !")
-        return {"success": True, "message": "Mise à jour installée avec succès !"}
+        print("✓ [MISE À JOUR] Fichiers mis à jour avec succès !")
+        return {"success": True, "message": "Mise à jour ZIP installée avec succès !"}
     except Exception as e:
         print(f"❌ [MISE À JOUR] Erreur : {e}")
         if os.path.exists(temp_zip):

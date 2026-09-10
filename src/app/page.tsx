@@ -49,7 +49,12 @@ import {
   Compass,
   Radio,
   Lightbulb,
+  GitCommit,
+  GitBranch,
+  Calendar,
+  User,
 } from 'lucide-react';
+import { APP_VERSION } from '@/lib/version';
 
 export default function CompanionApp() {
   const [profile, setProfile] = useState<CompanionProfile>(DEFAULT_PROFILE);
@@ -82,6 +87,15 @@ export default function CompanionApp() {
     notes?: string;
     downloadUrl?: string;
     error?: string;
+    localCommit?: string;
+    commit?: {
+      sha?: string;
+      fullSha?: string;
+      message?: string;
+      author?: string;
+      date?: string;
+      url?: string;
+    };
   } | null>(null);
   const [updateToast, setUpdateToast] = useState<string | null>(null);
 
@@ -206,42 +220,83 @@ export default function CompanionApp() {
     e.target.value = '';
   };
 
-  // --- Mise à Jour Automatique 1-Clic ---
+  // --- Mise à Jour Automatique 1-Clic & Inspection Commit ---
   const handleCheckUpdate = async () => {
     setIsUpdateModalOpen(true);
     setUpdateChecking(true);
     setUpdateToast(null);
     try {
       const bridgeUrl = macroManager.getBridgeUrl();
-      const res = await fetch(`${bridgeUrl}/update/check`);
-      if (res.ok) {
-        const data = await res.json();
-        setUpdateInfo(data);
-      } else {
-        // Repli direct sur l'API GitHub Releases depuis le navigateur
-        const ghRes = await fetch('https://api.github.com/repos/nxm310/nova/releases/latest');
-        if (ghRes.ok) {
-          const ghData = await ghRes.json();
-          const tag = ghData.tag_name || 'v1.0.0';
-          let dlUrl = '';
-          for (const a of ghData.assets || []) {
-            if (a.name?.endsWith('.zip')) {
-              dlUrl = a.browser_download_url;
-              break;
-            }
+      let bridgeData: any = null;
+      try {
+        const res = await fetch(`${bridgeUrl}/update/check`);
+        if (res.ok) {
+          bridgeData = await res.json();
+        }
+      } catch (be) {
+        console.warn('Pont PC non joignable pour /update/check, repli direct GitHub:', be);
+      }
+
+      // 1. Récupérer le dernier commit GitHub en direct
+      let commitData: any = bridgeData?.commit || null;
+      if (!commitData || !commitData.message) {
+        try {
+          const cRes = await fetch('https://api.github.com/repos/nxm310/nova/commits/main');
+          if (cRes.ok) {
+            const cJson = await cRes.json();
+            commitData = {
+              sha: cJson.sha ? cJson.sha.slice(0, 7) : '',
+              fullSha: cJson.sha || '',
+              message: cJson.commit?.message || '',
+              author: cJson.commit?.author?.name || 'Contributeur Nova',
+              date: cJson.commit?.author?.date || '',
+              url: cJson.html_url || '',
+            };
           }
-          setUpdateInfo({
-            success: true,
-            hasUpdate: tag !== 'v1.0.1' && tag !== '1.0.1',
-            currentVersion: '1.0.1',
-            latestVersion: tag,
-            notes: ghData.body || '',
-            downloadUrl: dlUrl || 'https://github.com/nxm310/nova/releases/download/v1.0.0/Nova-StarCitizen-Windows.zip',
-          });
-        } else {
-          setUpdateInfo({ error: "Impossible de joindre le serveur de mise à jour GitHub." });
+        } catch (ce) {
+          console.warn('Erreur interrogation commit GitHub:', ce);
         }
       }
+
+      // 2. Récupérer la dernière release GitHub
+      let releaseTag = bridgeData?.latestVersion || '';
+      let releaseNotes = bridgeData?.notes || '';
+      let downloadUrl = bridgeData?.downloadUrl || '';
+
+      if (!releaseTag || releaseTag === 'v1.0.0' || releaseTag === '1.0.0') {
+        try {
+          const ghRes = await fetch('https://api.github.com/repos/nxm310/nova/releases/latest');
+          if (ghRes.ok) {
+            const ghData = await ghRes.json();
+            releaseTag = ghData.tag_name || `v${APP_VERSION}`;
+            if (!releaseNotes) releaseNotes = ghData.body || '';
+            for (const a of ghData.assets || []) {
+              if (a.name?.endsWith('.zip')) {
+                downloadUrl = a.browser_download_url;
+                break;
+              }
+            }
+          }
+        } catch (re) {
+          console.warn('Erreur interrogation release GitHub:', re);
+        }
+      }
+
+      const cleanTag = (releaseTag || APP_VERSION).replace(/^v/, '');
+      const hasUpdate = (bridgeData && bridgeData.hasUpdate !== undefined)
+        ? bridgeData.hasUpdate
+        : (cleanTag !== APP_VERSION);
+
+      setUpdateInfo({
+        success: true,
+        hasUpdate,
+        currentVersion: APP_VERSION,
+        latestVersion: cleanTag,
+        notes: releaseNotes || commitData?.message || '',
+        downloadUrl: downloadUrl || 'https://github.com/nxm310/nova/releases/download/v1.0.1/Nova-StarCitizen-Windows.zip',
+        commit: commitData,
+        localCommit: bridgeData?.localCommit || '',
+      });
     } catch (err: any) {
       setUpdateInfo({ error: "Erreur de vérification des mises à jour : " + (err?.message || err) });
     } finally {
@@ -835,6 +890,9 @@ export default function CompanionApp() {
               </h1>
               <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/20 uppercase tracking-wider">
                 {currentPreset?.name.split('&')[0].trim() || 'Co-Pilote'}
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-cyan-400 font-bold">
+                v{APP_VERSION}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
@@ -1503,12 +1561,12 @@ export default function CompanionApp() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-5 overflow-y-auto space-y-4">
+            <div className="p-5 overflow-y-auto space-y-4 max-h-[80vh] custom-scrollbar">
               {updateChecking ? (
                 <div className="py-12 flex flex-col items-center justify-center space-y-3 text-center">
-                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-                  <p className="text-sm text-slate-300 font-medium">Recherche des mises à jour sur GitHub...</p>
-                  <p className="text-xs text-slate-500">Connexion au dépôt officiel nxm310/nova</p>
+                  <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                  <p className="text-sm text-slate-300 font-medium">Vérification de la version & des commits GitHub...</p>
+                  <p className="text-xs text-slate-500">Connexion au dépôt nxm310/nova</p>
                 </div>
               ) : updateInfo?.error ? (
                 <div className="space-y-4">
@@ -1522,78 +1580,172 @@ export default function CompanionApp() {
                   <div className="flex items-center justify-between gap-3 pt-2">
                     <button
                       onClick={handleCheckUpdate}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md active:scale-95 transition"
+                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md active:scale-95 transition"
                     >
                       Réessayer
                     </button>
                     <a
-                      href="https://github.com/nxm310/nova/releases"
+                      href="https://github.com/nxm310/nova/commits/main"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 underline"
+                      className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 underline"
                     >
-                      <span>Voir sur GitHub</span>
+                      <span>Voir les commits sur GitHub</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>
                 </div>
-              ) : updateInfo?.hasUpdate ? (
+              ) : (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                  {/* Cartouche d'état de version */}
+                  <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-1">
-                      <div className="text-sm font-semibold text-white flex items-center gap-2">
-                        <span>Nouvelle mise à jour disponible !</span>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-mono border border-emerald-500/40">
-                          {updateInfo.latestVersion}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">Version installée :</span>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-cyan-300 font-mono text-xs font-bold">
+                          v{APP_VERSION}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400">
-                        Version actuelle installée : <span className="font-mono text-slate-300">{updateInfo.currentVersion || 'v1.0.1'}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {updateInfo.notes && (
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Nouveautés :</label>
-                      <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs text-slate-300 font-mono whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed">
-                        {updateInfo.notes}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">Dernière version GitHub :</span>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-emerald-300 font-mono text-xs font-bold">
+                          v{updateInfo?.latestVersion || APP_VERSION}
+                        </span>
                       </div>
                     </div>
-                  )}
 
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300/90 leading-relaxed flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Vos configurations (touches de commandes, clé API, profil) sont préservées automatiquement.</span>
+                    <div>
+                      {updateInfo?.hasUpdate ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold shadow-sm animate-pulse">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Mise à jour disponible</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-semibold">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Application à jour</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="pt-2 space-y-2">
-                    <button
-                      onClick={handleApplyUpdate}
-                      disabled={updateApplying}
-                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait active:scale-[0.99] transition"
-                    >
-                      {updateApplying ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Mise à jour en cours (téléchargement et installation)...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-4 h-4" />
-                          <span>Installer la mise à jour maintenant (1-Clic)</span>
-                        </>
-                      )}
-                    </button>
+                  {/* CADRE DU DERNIER COMMIT ET DÉTAIL DES MODIFICATIONS */}
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/90 overflow-hidden shadow-inner">
+                    {/* Header du Commit */}
+                    <div className="p-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                          <GitCommit className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                          Dernier Déploiement GitHub
+                        </span>
+                      </div>
 
-                    {updateInfo.downloadUrl && (
+                      {updateInfo?.commit?.sha && (
+                        <a
+                          href={updateInfo.commit.url || `https://github.com/nxm310/nova/commit/${updateInfo.commit.fullSha}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 text-[11px] font-mono hover:bg-cyan-900/60 transition"
+                          title="Voir ce commit sur GitHub"
+                        >
+                          <span>Commit {updateInfo.commit.sha}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Détails Auteur & Date */}
+                    {updateInfo?.commit && (
+                      <div className="px-3.5 py-2 border-b border-slate-800/60 flex flex-wrap items-center gap-4 text-[11px] text-slate-400 bg-slate-900/40">
+                        {updateInfo.commit.author && (
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3 h-3 text-slate-400" />
+                            <span>Par <strong className="text-slate-200">{updateInfo.commit.author}</strong></span>
+                          </div>
+                        )}
+                        {updateInfo.commit.date && (
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            <span>
+                              {new Date(updateInfo.commit.date).toLocaleDateString('fr-FR', {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric',
+                              })}{' '}
+                              à{' '}
+                              {new Date(updateInfo.commit.date).toLocaleTimeString('fr-FR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Corps & Description complète de toutes les modifications */}
+                    <div className="p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <span>Description des modifications :</span>
+                        </label>
+                      </div>
+
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-xs text-slate-300 font-mono whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed selection:bg-cyan-500/30 custom-scrollbar">
+                        {updateInfo?.notes || updateInfo?.commit?.message || "Aucune note additionnelle de commit."}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Note de persistance */}
+                  <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-xs text-purple-200 leading-relaxed flex items-center gap-2.5">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      Vos configurations, macros clavier et clés API sont conservées dans{' '}
+                      <strong className="text-white font-mono text-[11px]">%APPDATA%\Nova\nova_config.json</strong>.
+                    </span>
+                  </div>
+
+                  {/* Boutons d'Action */}
+                  <div className="pt-2 space-y-2">
+                    {updateInfo?.hasUpdate ? (
+                      <button
+                        onClick={handleApplyUpdate}
+                        disabled={updateApplying}
+                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait active:scale-[0.99] transition"
+                      >
+                        {updateApplying ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Mise à jour en cours d'application...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-4 h-4" />
+                            <span>Installer la mise à jour maintenant (1-Clic)</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleCheckUpdate}
+                        disabled={updateChecking}
+                        className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-semibold shadow-sm flex items-center justify-center gap-2 active:scale-[0.99] transition"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${updateChecking ? 'animate-spin text-cyan-400' : ''}`} />
+                        <span>Re-vérifier les mises à jour sur GitHub</span>
+                      </button>
+                    )}
+
+                    {updateInfo?.downloadUrl && (
                       <div className="text-center pt-1">
                         <a
                           href={updateInfo.downloadUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[11px] text-slate-400 hover:text-slate-200 underline inline-flex items-center gap-1"
+                          className="text-[11px] text-slate-400 hover:text-cyan-300 underline inline-flex items-center gap-1 transition"
                         >
                           <span>Ou télécharger directement le .zip depuis GitHub</span>
                           <ExternalLink className="w-3 h-3" />
@@ -1601,24 +1753,6 @@ export default function CompanionApp() {
                       </div>
                     )}
                   </div>
-                </div>
-              ) : (
-                <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                    <Check className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-bold text-white">Votre Nova est à jour !</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Vous disposez de la version la plus récente ({updateInfo?.currentVersion || 'v1.0.1'}).
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleCheckUpdate}
-                    className="mt-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition"
-                  >
-                    Vérifier à nouveau
-                  </button>
                 </div>
               )}
             </div>
