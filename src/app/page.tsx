@@ -440,13 +440,9 @@ export default function CompanionApp() {
       return;
     }
 
-    // 3. Gemini Audio Natif (Direct Google API)
+    // 3. Google / Gemini Audio Natif
     if (profile.voiceProvider === 'gemini') {
-      const apiKey = storage.getApiKey();
-      if (!apiKey) {
-        audioManager.speakWebSpeech(cleanText, { rate: profile.speechRate, onEnd, onError });
-        return;
-      }
+      const apiKey = storage.getApiKey() || '';
       try {
         const audioUrl = await geminiClient.generateSpeech({
           text: cleanText,

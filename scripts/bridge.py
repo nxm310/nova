@@ -19,7 +19,9 @@ import zipfile
 import threading
 import webbrowser
 import subprocess
+import re
 import urllib.request
+import urllib.parse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 try:
     from http.server import ThreadingHTTPServer
@@ -27,7 +29,7 @@ except ImportError:
     ThreadingHTTPServer = HTTPServer
 
 PORT = 5005
-CURRENT_VERSION = "1.0.2"
+CURRENT_VERSION = "1.0.3"
 
 def find_out_dir() -> str:
     """Détermine le dossier des fichiers statiques exportés de l'application."""
@@ -504,7 +506,60 @@ def apply_github_update(download_url: str = "") -> dict:
                 os.remove(temp_zip)
             except Exception:
                 pass
-        return {"success": False, "error": str(e)}
+# Cache mémoire pour la synthèse vocale instantanée
+TTS_CACHE = {}
+
+def synthesize_google_tts(text: str, lang: str = "fr") -> bytes:
+    """Synthèse vocale native Google haute fidélité sans clé API requise."""
+    clean_text = (text or "").strip()
+    if not clean_text:
+        return b""
+
+    cache_key = f"{lang}:{clean_text}"
+    if cache_key in TTS_CACHE:
+        return TTS_CACHE[cache_key]
+
+    # Découpage intelligent en segments de 180 caractères max
+    sentences = re.split(r'([.?!:;\n,]+)', clean_text)
+    chunks = []
+    curr = ""
+    for part in sentences:
+        if len(curr) + len(part) <= 180:
+            curr += part
+        else:
+            if curr.strip():
+                chunks.append(curr.strip())
+            curr = part
+    if curr.strip():
+        chunks.append(curr.strip())
+
+    if not chunks:
+        chunks = [clean_text[:180]]
+
+    audio_bytes = bytearray()
+    for chunk in chunks[:15]:
+        enc = urllib.parse.quote(chunk)
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang}&client=tw-ob&q={enc}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+            }
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=7) as res:
+                audio_bytes.extend(res.read())
+        except Exception as e:
+            print(f"[TTS Segment Erreur] {chunk[:30]}... : {e}")
+
+    result = bytes(audio_bytes)
+    if result:
+        # Garder le cache à une taille raisonnable (max 200 entrées)
+        if len(TTS_CACHE) > 200:
+            TTS_CACHE.clear()
+        TTS_CACHE[cache_key] = result
+
+    return result
 
 class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -569,6 +624,32 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             info = check_github_update()
             self.wfile.write(json.dumps(info).encode("utf-8"))
+            return
+
+        if clean in ('/api/tts', '/nova/api/tts', '/tts', '/nova/tts', '/api/tts/google', '/nova/api/tts/google'):
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            text = params.get('text', [''])[0] or params.get('q', [''])[0]
+            lang = params.get('lang', ['fr'])[0]
+            if not text.strip():
+                self.send_response(400)
+                self._send_cors()
+                self.end_headers()
+                return
+
+            audio_data = synthesize_google_tts(text, lang)
+            if audio_data:
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Content-Length", str(len(audio_data)))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self._send_cors()
+                self.end_headers()
+                self.wfile.write(audio_data)
+            else:
+                self.send_response(502)
+                self._send_cors()
+                self.end_headers()
             return
 
         if clean in ('', '/'):
@@ -642,6 +723,35 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
+
+        if clean in ('/api/tts', '/nova/api/tts', '/tts', '/nova/tts', '/api/tts/google', '/nova/api/tts/google'):
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body.decode("utf-8"))
+                text = data.get("text", "") or data.get("q", "")
+                lang = data.get("lang", "fr")
+                audio_data = synthesize_google_tts(text, lang)
+                if audio_data:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "audio/mpeg")
+                    self.send_header("Content-Length", str(len(audio_data)))
+                    self.send_header("Cache-Control", "public, max-age=86400")
+                    self._send_cors()
+                    self.end_headers()
+                    self.wfile.write(audio_data)
+                    return
+                else:
+                    self.send_response(502)
+                    self._send_cors()
+                    self.end_headers()
+                    return
+            except Exception as e:
+                print(f"[TTS POST ERREUR] {e}")
+                self.send_response(500)
+                self._send_cors()
+                self.end_headers()
+                return
 
         self.send_response(400)
         self._send_cors()

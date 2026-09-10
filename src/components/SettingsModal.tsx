@@ -421,11 +421,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     } else if (formData.voiceProvider === 'gemini') {
       const currentKey = apiKey || storage.getApiKey();
-      if (!currentKey) {
-        alert('Renseigne ta clé API Gemini dans l\'onglet "Clé API" pour tester la voix Gemini.');
-        setIsPlayingTest(false);
-        return;
-      }
       try {
         const audioUrl = await geminiClient.generateSpeech({
           text: testText,
@@ -440,9 +435,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           { robotEffect: formData.robotEffect }
         );
       } catch (err: any) {
-        console.error(err);
-        setIsPlayingTest(false);
-        alert('Erreur voix Gemini: ' + err.message);
+        console.warn('Synthèse Gemini bascule Web Speech:', err);
+        audioManager.speakWebSpeech(testText, {
+          rate: formData.speechRate,
+          pitch: formData.robotEffect ? 1.35 : 1.0,
+          onEnd: () => setIsPlayingTest(false),
+          onError: () => setIsPlayingTest(false),
+        });
       }
     }
   };
@@ -726,13 +725,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-sm">Gemini Audio</span>
+                      <span className="font-semibold text-sm">Google / Gemini</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium">
                         Natif
                       </span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Voix natives Google Gemini 2.0 (Puck, Aoede...). Expressivité et émotions directes.
+                      Voix Google Studio & Gemini 2.0 (Puck, Aoede...). Expressivité naturelle et diction fluide.
                     </p>
                   </div>
 

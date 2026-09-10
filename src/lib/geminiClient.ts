@@ -159,101 +159,122 @@ Exemple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTION:KEY:
   }: {
     text: string;
     voice?: string;
-    apiKey: string;
+    apiKey?: string;
   }): Promise<string> {
-    const key = (apiKey || '').trim();
-    if (!key) {
-      throw new Error(
-        "Clé API Gemini manquante. Renseigne ta clé API dans l'onglet 'Clé API' des Paramètres ⚙️."
-      );
+    const cleanText = (text || '').trim();
+    if (!cleanText) {
+      throw new Error("Texte manquant pour la synthèse vocale.");
     }
 
-    const candidateModels = ['gemini-2.0-flash', 'gemini-2.5-flash'];
-    let lastError: Error | null = null;
+    const key = (apiKey || '').trim();
 
-    for (const model of candidateModels) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-      const payload = {
-        contents: [
-          {
-            parts: [
-              {
-                text: `Prononce exactement la phrase suivante en français, sans aucun préambule ni commentaire : "${text.replace(/"/g, "'")}"`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: voice || 'Puck',
+    // 1. Si une clé API est configurée, tenter l'endpoint Gemini Multimodal Audio (gemini-2.0-flash-exp)
+    if (key) {
+      const candidateModels = ['gemini-2.0-flash-exp'];
+
+      for (const model of candidateModels) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const payload = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Prononce exactement la phrase suivante en français, sans aucun préambule ni commentaire : "${cleanText.replace(/"/g, "'")}"`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: voice || 'Puck',
+                },
               },
             },
           },
-        },
-      };
+        };
 
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData?.error?.message ||
-              `Erreur Gemini Audio (${response.status}: ${response.statusText})`
-          );
+          if (response.ok) {
+            const data = await response.json();
+            const parts = data.candidates?.[0]?.content?.parts || [];
+            const audioPart = parts.find((p: any) => p.inlineData || p.inline_data);
+            const inline = audioPart?.inlineData || audioPart?.inline_data;
+
+            if (inline && inline.data) {
+              const mimeType = inline.mimeType || inline.mime_type || 'audio/wav';
+              const base64Audio = inline.data;
+
+              const binaryString = window.atob(base64Audio);
+              const len = binaryString.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+
+              const isAlreadyWav =
+                bytes.length >= 4 &&
+                bytes[0] === 0x52 &&
+                bytes[1] === 0x49 &&
+                bytes[2] === 0x46 &&
+                bytes[3] === 0x46; // 'RIFF'
+
+              let blob: Blob;
+              if (isAlreadyWav) {
+                blob = new Blob([bytes], { type: 'audio/wav' });
+              } else {
+                let rate = 24000;
+                const match = (mimeType || '').match(/rate=(\d+)/);
+                if (match) rate = parseInt(match[1], 10);
+                blob = pcmToWavBlob(bytes, rate);
+              }
+
+              return URL.createObjectURL(blob);
+            }
+          } else {
+            const errBody = await response.text().catch(() => '');
+            console.warn(`[Gemini Audio] Modèle ${model} non disponible en audio REST:`, errBody);
+          }
+        } catch (err: any) {
+          console.warn(`[Gemini Audio] Tentative (${model}) échouée, passage au moteur vocal Google:`, err?.message || err);
         }
-
-        const data = await response.json();
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        const audioPart = parts.find((p: any) => p.inlineData || p.inline_data);
-        const inline = audioPart?.inlineData || audioPart?.inline_data;
-
-        if (!inline || !inline.data) {
-          throw new Error("L'API Gemini n'a pas renvoyé de piste audio dans la réponse.");
-        }
-
-        const mimeType = inline.mimeType || inline.mime_type || 'audio/wav';
-        const base64Audio = inline.data;
-
-        const binaryString = window.atob(base64Audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        const isAlreadyWav =
-          bytes.length >= 4 &&
-          bytes[0] === 0x52 &&
-          bytes[1] === 0x49 &&
-          bytes[2] === 0x46 &&
-          bytes[3] === 0x46; // 'RIFF'
-
-        let blob: Blob;
-        if (isAlreadyWav) {
-          blob = new Blob([bytes], { type: 'audio/wav' });
-        } else {
-          let rate = 24000;
-          const match = (mimeType || '').match(/rate=(\d+)/);
-          if (match) rate = parseInt(match[1], 10);
-          blob = pcmToWavBlob(bytes, rate);
-        }
-
-        return URL.createObjectURL(blob);
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`Tentative synthèse Gemini audio (${model}) échouée :`, err.message);
       }
     }
 
-    throw lastError || new Error("Impossible de générer l'audio avec Gemini.");
+    // 2. Moteur vocal Google haute fidélité via le pont local Nova (port 5005 ou relatif)
+    const ttsEndpoints = [
+      `/api/tts?text=${encodeURIComponent(cleanText)}&lang=fr`,
+      `/nova/api/tts?text=${encodeURIComponent(cleanText)}&lang=fr`,
+      `http://127.0.0.1:5005/api/tts?text=${encodeURIComponent(cleanText)}&lang=fr`,
+    ];
+
+    for (const ep of ttsEndpoints) {
+      try {
+        const res = await fetch(ep, { method: 'GET' });
+        if (res.ok) {
+          const blob = await res.blob();
+          if (blob && blob.size > 200) {
+            return URL.createObjectURL(blob);
+          }
+        }
+      } catch {
+        // En cas d'échec sur cet endpoint, passer au suivant
+      }
+    }
+
+    // 3. Repli direct vers le flux audio Google Translate TTS (accessible en lecture directe Audio)
+    const directUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=fr&client=tw-ob&q=${encodeURIComponent(
+      cleanText.slice(0, 180)
+    )}`;
+    return directUrl;
   },
 };
 
