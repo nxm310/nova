@@ -104,6 +104,8 @@ export default function CompanionApp() {
   const [callState, setCallState] = useState<LiveCallState>('listening');
   const [liveTranscript, setLiveTranscript] = useState('');
   const [lastReply, setLastReply] = useState('');
+  const [isCallMuted, setIsCallMuted] = useState<boolean>(false);
+  const isCallMutedRef = useRef(false);
 
   // États du Cockpit Touch Deck
   const [isDeckOpen, setIsDeckOpen] = useState(true);
@@ -116,6 +118,34 @@ export default function CompanionApp() {
   const recognitionRef = useRef<any>(null);
   const continuousRecognizerRef = useRef<any>(null);
   const isCallActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedMute = localStorage.getItem('sc_call_muted') === 'true';
+      setIsCallMuted(savedMute);
+      isCallMutedRef.current = savedMute;
+    }
+  }, []);
+
+  const handleToggleCallMute = () => {
+    setIsCallMuted((prev) => {
+      const next = !prev;
+      isCallMutedRef.current = next;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sc_call_muted', String(next));
+      }
+      if (next) {
+        audioManager.stopAll();
+        setIsPlayingAudio(false);
+        setPlayingMessageId(null);
+        if (isCallActiveRef.current && callState === 'speaking') {
+          setCallState('listening');
+          continuousRecognizerRef.current?.start();
+        }
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -560,14 +590,21 @@ export default function CompanionApp() {
 
         if (!isCallActiveRef.current) return;
 
-        setCallState('speaking');
-        playSpeech(botReply, botMessage.id, () => {
-          if (isCallActiveRef.current) {
-            setLiveTranscript('');
-            setCallState('listening');
-            continuousRecognizerRef.current?.start();
-          }
-        });
+        if (isCallMutedRef.current) {
+          // Mode silencieux : afficher la réponse par écrit sans vocaliser
+          setLiveTranscript('');
+          setCallState('listening');
+          continuousRecognizerRef.current?.start();
+        } else {
+          setCallState('speaking');
+          playSpeech(botReply, botMessage.id, () => {
+            if (isCallActiveRef.current) {
+              setLiveTranscript('');
+              setCallState('listening');
+              continuousRecognizerRef.current?.start();
+            }
+          });
+        }
         return;
       }
     } catch (macroErr) {
@@ -627,16 +664,23 @@ export default function CompanionApp() {
 
       if (!isCallActiveRef.current) return;
 
-      setCallState('speaking');
+      if (isCallMutedRef.current) {
+        // Mode silencieux : afficher la réponse par écrit sans vocaliser
+        setLiveTranscript('');
+        setCallState('listening');
+        continuousRecognizerRef.current?.start();
+      } else {
+        setCallState('speaking');
 
-      playSpeech(displayReply, botMessage.id, () => {
-        // Une fois la lecture audio finie : relancer automatiquement l'écoute !
-        if (isCallActiveRef.current) {
-          setLiveTranscript('');
-          setCallState('listening');
-          continuousRecognizerRef.current?.start();
-        }
-      });
+        playSpeech(displayReply, botMessage.id, () => {
+          // Une fois la lecture audio finie : relancer automatiquement l'écoute !
+          if (isCallActiveRef.current) {
+            setLiveTranscript('');
+            setCallState('listening');
+            continuousRecognizerRef.current?.start();
+          }
+        });
+      }
     } catch (err: any) {
       console.warn('Erreur appel vocal chat:', err);
       setCallState('listening');
@@ -1566,6 +1610,8 @@ export default function CompanionApp() {
         isVisionActive={isVisionActive}
         onToggleVision={handleToggleVision}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        isMuted={isCallMuted}
+        onToggleMute={handleToggleCallMute}
       />
 
       {/* Modal de Mise à Jour 1-Clic */}

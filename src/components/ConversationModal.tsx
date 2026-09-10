@@ -6,6 +6,7 @@ import {
   PhoneOff,
   Mic,
   Volume2,
+  VolumeX,
   Loader2,
   Square,
   Sparkles,
@@ -31,6 +32,8 @@ interface ConversationModalProps {
   isVisionActive?: boolean;
   onToggleVision?: () => void;
   onOpenSettings?: () => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 }
 
 export const ConversationModal: React.FC<ConversationModalProps> = ({
@@ -45,6 +48,8 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
   isVisionActive,
   onToggleVision,
   onOpenSettings,
+  isMuted,
+  onToggleMute,
 }) => {
   const [inputText, setInputText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +91,26 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {onToggleMute && (
+            <button
+              onClick={onToggleMute}
+              type="button"
+              className={`text-xs px-2.5 py-1 rounded-full border flex items-center gap-1.5 transition-all ${
+                isMuted
+                  ? 'bg-amber-950/80 border-amber-500 text-amber-300 shadow-sm shadow-amber-500/20'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white'
+              }`}
+              title={isMuted ? 'Réactiver la voix du compagnon' : 'Couper la voix du compagnon (mode muet / écrit uniquement)'}
+            >
+              {isMuted ? (
+                <VolumeX className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+              )}
+              <span className="hidden sm:inline">{isMuted ? 'Muet (Écrit seul)' : 'Voix ON'}</span>
+              <span className="sm:hidden">{isMuted ? 'Muet' : 'Voix'}</span>
+            </button>
+          )}
           {onToggleVision && (
             <button
               onClick={onToggleVision}
@@ -155,7 +180,7 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
                 callState === 'speaking'
                   ? 'bg-accent-600 text-white'
                   : callState === 'listening'
-                  ? 'bg-cyan-600 text-white'
+                  ? (isMuted ? 'bg-amber-600 text-white shadow-amber-500/20' : 'bg-cyan-600 text-white')
                   : 'bg-slate-800 text-slate-300'
               }`}
             >
@@ -168,7 +193,7 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
               {callState === 'listening' && (
                 <>
                   <Mic className="w-3 h-3 animate-pulse" />
-                  <span>Je t'écoute...</span>
+                  <span>{isMuted ? "Je t'écoute (muet)..." : "Je t'écoute..."}</span>
                 </>
               )}
               {callState === 'thinking' && (
@@ -180,6 +205,14 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Badge d'indication mode muet */}
+        {isMuted && (
+          <div className="flex items-center gap-1.5 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-500/30 px-3 py-1 rounded-full shadow-sm animate-fade-in">
+            <VolumeX className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Mode Silencieux : {profile.name} répond uniquement par écrit</span>
+          </div>
+        )}
 
         {/* Live User Speech Indicator */}
         <div className="w-full min-h-[36px] flex items-center justify-center px-3 text-center">
@@ -277,17 +310,42 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
       </div>
 
       {/* Bottom Controls */}
-      <footer className="w-full max-w-xs flex items-center justify-center gap-6 pt-1 pb-2">
+      <footer className="w-full max-w-xs flex items-center justify-center gap-5 sm:gap-6 pt-1 pb-2">
+        {/* Bouton Mute / Silencieux */}
+        {onToggleMute && (
+          <button
+            type="button"
+            onClick={onToggleMute}
+            className={`flex flex-col items-center gap-1.5 text-xs transition active:scale-95 ${
+              isMuted ? 'text-amber-300' : 'text-slate-300 hover:text-white'
+            }`}
+            title={isMuted ? 'Réactiver la voix du compagnon' : 'Couper la voix du compagnon (Mode muet / écrit uniquement)'}
+          >
+            <div
+              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border transition-all shadow-lg ${
+                isMuted
+                  ? 'bg-amber-950/90 border-amber-500 text-amber-300 shadow-amber-500/30 ring-2 ring-amber-500/40'
+                  : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white'
+              }`}
+            >
+              {isMuted ? <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" /> : <Volume2 className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" />}
+            </div>
+            <span className="font-medium text-[11px] sm:text-xs">
+              {isMuted ? 'Muet (ON)' : 'Son (Actif)'}
+            </span>
+          </button>
+        )}
+
         {/* Bouton Interrompre si le robot parle */}
         {callState === 'speaking' && (
           <button
             onClick={onInterrupt}
             className="flex flex-col items-center gap-1.5 text-xs text-slate-300 hover:text-white transition active:scale-95"
           >
-            <div className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-600 flex items-center justify-center text-red-400 shadow-md">
-              <Square className="w-4 h-4" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-600 flex items-center justify-center text-red-400 shadow-md">
+              <Square className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <span>Couper</span>
+            <span className="font-medium text-[11px] sm:text-xs">Couper</span>
           </button>
         )}
 
@@ -299,7 +357,7 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center text-white shadow-xl shadow-red-600/30">
             <PhoneOff className="w-6 h-6 sm:w-7 sm:h-7" />
           </div>
-          <span className="font-medium">Raccrocher</span>
+          <span className="font-medium text-[11px] sm:text-xs">Raccrocher</span>
         </button>
       </footer>
     </div>
