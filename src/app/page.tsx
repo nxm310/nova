@@ -15,7 +15,7 @@ import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { ConversationModal, LiveCallState } from '@/components/ConversationModal';
 import { visionManager } from '@/lib/vision';
-import { macroManager } from '@/lib/voiceMacros';
+import { macroManager, VoiceMacro } from '@/lib/voiceMacros';
 import { geminiClient } from '@/lib/geminiClient';
 import {
   Settings,
@@ -41,6 +41,14 @@ import {
   AlertTriangle,
   X,
   ExternalLink,
+  Gamepad2,
+  Rocket,
+  Shield,
+  Zap,
+  Clock,
+  Compass,
+  Radio,
+  Lightbulb,
 } from 'lucide-react';
 
 export default function CompanionApp() {
@@ -83,6 +91,12 @@ export default function CompanionApp() {
   const [liveTranscript, setLiveTranscript] = useState('');
   const [lastReply, setLastReply] = useState('');
 
+  // États du Cockpit Touch Deck
+  const [isDeckOpen, setIsDeckOpen] = useState(true);
+  const [deckFeedbackKey, setDeckFeedbackKey] = useState<string | null>(null);
+  const [activeMacros, setActiveMacros] = useState<VoiceMacro[]>([]);
+  const [deckCategory, setDeckCategory] = useState<'all' | 'flight' | 'systems' | 'hud'>('all');
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef(messages);
   const recognitionRef = useRef<any>(null);
@@ -102,6 +116,9 @@ export default function CompanionApp() {
     setProfile(loadedProfile);
     setMessages(loadedMessages);
     setMemories(loadedMemories);
+
+    // Initialiser les macros Star Citizen
+    setActiveMacros(macroManager.getMacros());
 
     // Initialiser les voix synthèse Web Speech
     audioManager.getWebSpeechVoices();
@@ -740,56 +757,159 @@ export default function CompanionApp() {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  const handleDeckTrigger = async (macro: VoiceMacro) => {
+    setDeckFeedbackKey(macro.id);
+    try {
+      await macroManager.sendKeyToBridge(macro.key, macro.pressType, macro.holdDuration);
+      if (profile.autoPlayVoice) {
+        playSpeech(`Action ${macro.name}`);
+      }
+    } catch (err) {
+      console.error('Erreur exécution macro cockpit:', err);
+    } finally {
+      setTimeout(() => setDeckFeedbackKey(null), 600);
+    }
+  };
+
+  const getMacroCategory = (m: VoiceMacro): 'flight' | 'systems' | 'hud' => {
+    const k = m.key.toLowerCase();
+    const id = m.id.toLowerCase();
+    if (k.startsWith('f') || id.includes('mobiglas') || id.includes('starmap') || id.includes('camera') || id.includes('comms')) {
+      return 'hud';
+    }
+    if (
+      id.includes('power') ||
+      id.includes('engine') ||
+      id.includes('flight') ||
+      id.includes('gear') ||
+      id.includes('landing') ||
+      id.includes('vtol') ||
+      id.includes('decouple') ||
+      id.includes('cruise') ||
+      id.includes('seat')
+    ) {
+      return 'flight';
+    }
+    return 'systems';
+  };
+
+  const displayedMacros = activeMacros.filter((m) => {
+    if (!m.enabled) return false;
+    if (deckCategory === 'all') return true;
+    return getMacroCategory(m) === deckCategory;
+  });
+
   const currentPreset = PERSONALITY_PRESETS.find((p) => p.id === profile.presetId);
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-2xl mx-auto bg-slate-950 text-slate-100 overflow-hidden shadow-2xl relative">
-      {/* HEADER */}
-      <header className="flex items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-md z-30 safe-top">
-        <div className="flex items-center gap-3">
-          <div className="relative">
+    <div className="flex flex-col h-[100dvh] w-full bg-slate-950 text-slate-100 overflow-hidden relative selection:bg-cyan-500/30">
+      {/* HEADER COCKPIT ÉPURÉ & ÉQUILIBRÉ */}
+      <header className="flex items-center justify-between px-3 md:px-6 py-2.5 bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-xl z-30 safe-top select-none shrink-0 gap-2">
+        {/* Section GAUCHE : Identité Co-Pilote & Pont PC */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative shrink-0">
             <div
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center text-2xl bg-gradient-to-br from-indigo-500/30 to-purple-600/30 border transition-all duration-300 ${
+              className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl bg-gradient-to-br from-cyan-500/20 to-indigo-600/30 border transition-all duration-300 ${
                 isPlayingAudio
-                  ? 'border-accent-400 ring-2 ring-accent-400/50 shadow-lg shadow-accent-500/20 scale-105'
+                  ? 'border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-500/20 scale-105'
                   : 'border-slate-700'
               }`}
             >
               {profile.avatar}
             </div>
             <span
-              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-950 ${
+              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-950 ${
                 isPlayingAudio
-                  ? 'bg-accent-400 animate-pulse'
+                  ? 'bg-cyan-400 animate-pulse'
+                  : isRecording
+                  ? 'bg-rose-400 animate-ping'
                   : 'bg-emerald-400'
               }`}
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="font-bold text-base text-white tracking-tight">
+              <h1 className="font-bold text-sm md:text-base text-white tracking-tight truncate">
                 {profile.name}
               </h1>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-500/15 text-accent-300 font-medium border border-accent-500/20">
-                {currentPreset?.emoji} {currentPreset?.name.split('&')[0].trim()}
+              <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/20 uppercase tracking-wider">
+                {currentPreset?.name.split('&')[0].trim() || 'Co-Pilote'}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <AudioVisualizer isPlaying={isPlayingAudio} isListening={isRecording} />
-              {!isPlayingAudio && !isRecording && (
-                <span className="text-[11px] text-slate-400">En ligne pour toi</span>
-              )}
+              {/* Statut Pont PC Clavier */}
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono border transition ${
+                  bridgeConnected === true
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                    : bridgeConnected === false
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20 animate-pulse'
+                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+                }`}
+                title={
+                  bridgeConnected === true
+                    ? `✓ Pont PC actif (Port 5005). Vos ordres vocaux commandent Star Citizen !`
+                    : `⚠️ Pont PC déconnecté. Cliquez pour voir comment lancer DEMARRER_NOVA.bat sur votre PC.`
+                }
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    bridgeConnected === true
+                      ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
+                      : bridgeConnected === false
+                      ? 'bg-rose-400'
+                      : 'bg-amber-400'
+                  }`}
+                />
+                <span>
+                  {bridgeConnected === true
+                    ? 'Pont PC Prêt'
+                    : bridgeConnected === false
+                    ? 'Pont Déconnecté'
+                    : 'Pont PC...'}
+                </span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Contrôles Header */}
-        <div className="flex items-center gap-1.5">
+        {/* Section CENTRE : Actions Principales Cockpit */}
+        <div className="flex items-center gap-1.5 md:gap-2">
+          {/* Bascule Cockpit Touch Deck (Sidebar) */}
+          <button
+            onClick={() => setIsDeckOpen(!isDeckOpen)}
+            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-sm transition active:scale-95 ${
+              isDeckOpen
+                ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-cyan-500/10'
+                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+            }`}
+            title={isDeckOpen ? 'Masquer le Touch Deck des touches' : 'Afficher le Touch Deck des touches Star Citizen'}
+          >
+            <Gamepad2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Commandes Vaisseau</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 font-mono text-cyan-400 border border-slate-700">
+              {activeMacros.filter((m) => m.enabled).length}
+            </span>
+          </button>
+
+          {/* Bouton Appel Direct Mains-Libres */}
+          <button
+            onClick={startHandsFreeCall}
+            className="flex items-center gap-1.5 px-3 md:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/20 active:scale-95 transition"
+            title="Démarrer un appel vocal direct sans avoir à appuyer sur les boutons"
+          >
+            <Phone className="w-3.5 h-3.5 text-cyan-200 animate-pulse" />
+            <span className="hidden sm:inline">Appel Direct</span>
+            <span className="sm:hidden">Appel</span>
+          </button>
+
           {/* Bouton Partage / Vision Écran */}
           <button
             onClick={handleToggleVision}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold shadow-md active:scale-95 transition ${
+            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-sm active:scale-95 transition ${
               isVisionActive
                 ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20 animate-pulse'
                 : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
@@ -805,21 +925,14 @@ export default function CompanionApp() {
             ) : (
               <EyeOff className="w-3.5 h-3.5 text-slate-400" />
             )}
-            <span className="hidden sm:inline">
+            <span className="hidden md:inline">
               {isVisionActive ? 'Vision ON' : 'Vision'}
             </span>
           </button>
+        </div>
 
-          {/* Bouton Appel Direct Mains-Libres */}
-          <button
-            onClick={startHandsFreeCall}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-accent-600 to-indigo-600 hover:from-accent-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-accent-600/30 active:scale-95 transition"
-            title="Démarrer un appel vocal direct sans avoir à appuyer sur les boutons"
-          >
-            <Phone className="w-3.5 h-3.5 animate-pulse text-cyan-200" />
-            <span className="inline">Appel Direct</span>
-          </button>
-
+        {/* Section DROITE : Utilitaires & Configuration */}
+        <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
           {/* Bascule lecture auto voix */}
           <button
             onClick={() => {
@@ -830,7 +943,7 @@ export default function CompanionApp() {
             title={profile.autoPlayVoice ? 'Voix activée' : 'Voix coupée'}
             className={`p-2 rounded-xl border transition ${
               profile.autoPlayVoice
-                ? 'bg-accent-500/20 border-accent-500/30 text-accent-300'
+                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
                 : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
             }`}
           >
@@ -841,7 +954,7 @@ export default function CompanionApp() {
             )}
           </button>
 
-          {/* Bouton Effacer la conversation de l'écran */}
+          {/* Bouton Effacer la conversation */}
           <button
             onClick={() => {
               if (messages.length === 0) return;
@@ -862,57 +975,23 @@ export default function CompanionApp() {
             <Trash2 className="w-4 h-4" />
           </button>
 
-          {/* Indicateur d'état du Pont Clavier PC */}
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold shadow-sm active:scale-95 transition ${
-              bridgeConnected === true
-                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
-                : bridgeConnected === false
-                ? 'bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/40 text-rose-300'
-                : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
-            }`}
-            title={
-              bridgeConnected === true
-                ? `✓ Pont Clavier PC Connecté sur ${bridgeInfo?.url || 'Port 5005'}. Vos ordres vocaux actionnent directement les touches dans Star Citizen !`
-                : `⚠️ Pont Clavier Déconnecté. Cliquez pour afficher comment lancer DEMARRER_NOVA.bat sur votre PC.`
-            }
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                bridgeConnected === true
-                  ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
-                  : bridgeConnected === false
-                  ? 'bg-rose-400 animate-pulse'
-                  : 'bg-amber-400'
-              }`}
-            />
-            <span className="hidden lg:inline font-mono text-[11px]">
-              {bridgeConnected === true
-                ? 'Pont PC : Prêt'
-                : bridgeConnected === false
-                ? 'Pont PC : Déconnecté'
-                : 'Pont PC...'}
-            </span>
-          </button>
+          <div className="h-4 w-px bg-slate-800 hidden sm:block mx-0.5" />
 
           {/* Touche Sauvegarde Rapide */}
           <button
             onClick={handleQuickSave}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/35 border border-purple-500/40 text-purple-200 text-xs font-semibold shadow-sm active:scale-95 transition"
-            title="Sauvegarder mes réglages (touches, profil, clé API) pour pouvoir les restaurer à chaque réinstallation (Raccourci: Ctrl+S)"
+            className="p-2 rounded-xl bg-purple-600/15 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 transition"
+            title="Sauvegarder mes réglages (touches, profil, clé API) dans un fichier .json"
           >
-            <Save className="w-3.5 h-3.5 text-purple-300" />
-            <span className="hidden md:inline">Sauvegarder</span>
+            <Save className="w-4 h-4" />
           </button>
 
           {/* Touche Restauration Rapide */}
           <label
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/35 border border-cyan-500/40 text-cyan-200 text-xs font-semibold shadow-sm active:scale-95 transition cursor-pointer"
-            title="Restaurer mes réglages depuis une sauvegarde (.json)"
+            className="p-2 rounded-xl bg-cyan-600/15 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 transition cursor-pointer"
+            title="Restaurer mes réglages depuis un fichier de sauvegarde (.json)"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-cyan-300" />
-            <span className="hidden md:inline">Restaurer</span>
+            <FolderOpen className="w-4 h-4" />
             <input
               type="file"
               accept=".json,application/json"
@@ -924,18 +1003,17 @@ export default function CompanionApp() {
           {/* Touche Mise à Jour Automatique 1-Clic */}
           <button
             onClick={handleCheckUpdate}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 text-xs font-semibold shadow-sm active:scale-95 transition"
-            title="Rechercher et installer les mises à jour sans réinstaller"
+            className="p-2 rounded-xl bg-blue-600/15 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 transition"
+            title="Rechercher et installer les mises à jour"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-blue-300 ${updateChecking ? 'animate-spin' : ''}`} />
-            <span className="hidden md:inline">Mise à jour</span>
+            <RefreshCw className={`w-4 h-4 ${updateChecking ? 'animate-spin text-blue-400' : ''}`} />
           </button>
 
           {/* Bouton Paramètres */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-300 transition"
-            title="Paramètres du compagnon"
+            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 transition"
+            title="Paramètres de Nova & Touches"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -944,206 +1022,422 @@ export default function CompanionApp() {
 
       {/* Toast de confirmation de sauvegarde */}
       {quickSaveToast && (
-        <div className="fixed top-20 right-5 z-50 animate-fade-in bg-purple-950/95 text-purple-100 border border-purple-500 px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 backdrop-blur-md">
+        <div className="fixed top-16 right-5 z-50 animate-fade-in bg-purple-950/95 text-purple-100 border border-purple-500 px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 backdrop-blur-md">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>✓ Réglages sauvegardés dans votre dossier Téléchargements !</span>
+          <span>✓ Réglages sauvegardés dans vos Téléchargements</span>
         </div>
       )}
 
       {/* Toast de confirmation de mise à jour */}
       {updateToast && (
-        <div className="fixed top-20 right-5 z-50 animate-fade-in bg-blue-950/95 text-blue-100 border border-blue-500 px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 backdrop-blur-md">
+        <div className="fixed top-16 right-5 z-50 animate-fade-in bg-blue-950/95 text-blue-100 border border-blue-500 px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 backdrop-blur-md">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{updateToast}</span>
         </div>
       )}
 
-      {/* ZONE DE CHAT SCROLLABLE */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8 animate-fade-in space-y-6">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-accent-600/30 to-indigo-600/30 border border-accent-500/30 flex items-center justify-center text-4xl shadow-xl shadow-accent-500/10">
-              {profile.avatar}
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white mb-1.5">
-                Salut ! Je suis {profile.name}.
-              </h2>
-              <p className="text-sm text-slate-400 max-w-xs mx-auto leading-relaxed">
-                Je suis ton ami virtuel. On peut discuter de tout ce que tu veux, à l'écrit comme à l'oral.
-              </p>
+      {/* CORPS PRINCIPAL DU COCKPIT : TOUCH DECK + CHAT STREAM */}
+      <div className="flex-1 flex overflow-hidden w-full relative">
+        {/* SIDEBAR COCKPIT TOUCH DECK */}
+        <aside
+          className={`${
+            isDeckOpen ? 'flex' : 'hidden'
+          } absolute inset-y-0 left-0 z-20 w-72 sm:w-80 lg:relative lg:flex flex-col border-r border-slate-800 bg-slate-950/95 lg:bg-slate-900/40 backdrop-blur-xl shrink-0 transition-all duration-300`}
+        >
+          {/* Deck Header */}
+          <div className="p-3 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                <Rocket className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Cockpit Deck
+                </h2>
+                <p className="text-[10px] text-slate-400">Star Citizen Raccourcis</p>
+              </div>
             </div>
 
-            {/* Suggestions de départ */}
-            <div className="w-full max-w-sm space-y-2 pt-2">
-              <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
-                Engager la conversation :
-              </p>
-              {[
-                "Comment s'est passée ta journée ?",
-                "Raconte-moi une petite anecdote inspirante.",
-                "J'ai besoin d'un coup de motivation aujourd'hui !",
-              ].map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSendMessage(prompt)}
-                  className="w-full text-left p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 transition flex items-center justify-between group"
-                >
-                  <span>{prompt}</span>
-                  <Sparkles className="w-3.5 h-3.5 text-accent-400 opacity-60 group-hover:opacity-100 transition" />
-                </button>
-              ))}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-1 rounded-lg text-slate-400 hover:text-cyan-300 transition"
+                title="Modifier les touches dans les paramètres"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setIsDeckOpen(false)}
+                className="lg:hidden p-1 rounded-lg text-slate-400 hover:text-white transition"
+                title="Fermer le deck"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-        ) : (
-          messages.map((msg) => {
-            const isUser = msg.role === 'user';
-            const isPlayingThis = isPlayingAudio && playingMessageId === msg.id;
 
-            return (
-              <div
-                key={msg.id}
-                className={`flex gap-2.5 animate-fade-in ${
-                  isUser ? 'justify-end' : 'justify-start'
+          {/* Onglets Filtres Catégories */}
+          <div className="p-2 border-b border-slate-800/60 flex items-center gap-1 text-[11px]">
+            {(
+              [
+                { id: 'all', label: 'Tous' },
+                { id: 'flight', label: 'Vol' },
+                { id: 'systems', label: 'Systèmes' },
+                { id: 'hud', label: 'HUD/Nav' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setDeckCategory(tab.id)}
+                className={`flex-1 py-1 px-1.5 rounded-lg font-medium text-center transition ${
+                  deckCategory === tab.id
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
                 }`}
               >
-                {!isUser && (
-                  <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-lg bg-slate-800 border border-slate-700 mt-0.5">
-                    {profile.avatar}
-                  </div>
-                )}
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-                <div
-                  className={`group relative max-w-[82%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-md ${
-                    isUser
-                      ? 'bg-gradient-to-br from-accent-600 to-indigo-600 text-white rounded-br-sm'
-                      : 'bg-slate-900/90 border border-slate-800 text-slate-100 rounded-bl-sm'
-                  }`}
-                >
-                  <p className="leading-relaxed whitespace-pre-wrap selection:bg-accent-400/30">
-                    {msg.content}
-                  </p>
+          {/* Liste Scrollable des Touches Cockpit */}
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 custom-scrollbar">
+            {displayedMacros.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-500">
+                Aucune commande active dans cette catégorie.
+              </div>
+            ) : (
+              displayedMacros.map((macro) => {
+                const isTriggered = deckFeedbackKey === macro.id;
+                const isHold = macro.pressType === 'hold';
 
-                  {/* Actions sous le message compagnon */}
-                  {!isUser && (
-                    <div className="flex items-center justify-between gap-3 mt-2 pt-1.5 border-t border-slate-800/60 text-[11px] text-slate-400">
-                      <button
-                        onClick={() => playSpeech(msg.content, msg.id)}
-                        className={`flex items-center gap-1 hover:text-white transition px-1.5 py-0.5 rounded ${
-                          isPlayingThis ? 'text-accent-400 font-semibold' : ''
-                        }`}
-                      >
-                        {isPlayingThis ? (
-                          <>
-                            <Square className="w-3 h-3 text-red-400" />
-                            <span>Stop</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3 h-3 text-accent-400" />
-                            <span>Écouter</span>
-                          </>
+                return (
+                  <button
+                    key={macro.id}
+                    onClick={() => handleDeckTrigger(macro)}
+                    className={`w-full text-left p-2 rounded-xl border transition-all duration-150 relative overflow-hidden group select-none ${
+                      isTriggered
+                        ? 'bg-cyan-500/30 border-cyan-400 scale-[0.98] shadow-lg shadow-cyan-500/20'
+                        : 'bg-slate-900/70 hover:bg-slate-800/80 border-slate-800/80 hover:border-cyan-500/40'
+                    }`}
+                  >
+                    {isTriggered && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-transparent animate-pulse" />
+                    )}
+
+                    <div className="flex items-center justify-between relative z-10">
+                      <span className="font-semibold text-xs text-slate-200 group-hover:text-white truncate">
+                        {macro.name}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                        {isHold && (
+                          <span className="px-1 py-0.2 rounded bg-purple-500/20 border border-purple-500/30 text-[9px] font-mono text-purple-300">
+                            {macro.holdDuration || 1.5}s
+                          </span>
                         )}
-                      </button>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => copyToClipboard(msg.content, msg.id)}
-                          className="hover:text-white transition p-0.5"
-                          title="Copier"
-                        >
-                          {copiedId === msg.id ? (
-                            <Check className="w-3 h-3 text-emerald-400" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
-                        <span className="text-[10px] text-slate-500">
-                          {new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/40 text-[10px] font-mono font-bold text-cyan-300 uppercase shadow-sm">
+                          {macro.key}
                         </span>
                       </div>
                     </div>
-                  )}
 
-                  {isUser && (
-                    <div className="text-[10px] text-indigo-200 text-right mt-1">
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-
-        {/* Indicateur de génération */}
-        {isLoading && (
-          <div className="flex gap-2.5 items-start animate-fade-in">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg bg-slate-800 border border-slate-700">
-              {profile.avatar}
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl rounded-bl-sm px-4 py-2.5 flex items-center gap-2 text-slate-400 text-xs">
-              <Loader2 className="w-4 h-4 animate-spin text-accent-400" />
-              <span>{profile.name} réfléchit...</span>
-            </div>
+                    {macro.phrases[0] && (
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400 group-hover:text-slate-300 mt-1 relative z-10 truncate">
+                        <span className="text-cyan-400">🎙️</span>
+                        <span className="truncate">« {macro.phrases[0]} »</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
-        )}
 
-        <div ref={messagesEndRef} />
-      </main>
+          {/* Footer Deck */}
+          <div className="p-2.5 border-t border-slate-800/80 bg-slate-950/80 text-[10px] text-slate-400 flex items-center justify-between">
+            <span className="flex items-center gap-1 font-mono">
+              <Zap className="w-3 h-3 text-cyan-400" />
+              <span>Pont 5005</span>
+            </span>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="text-cyan-400 hover:underline flex items-center gap-0.5 font-medium"
+            >
+              <span>Personnaliser</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </button>
+          </div>
+        </aside>
 
-      {/* BARRE DE SAISIE INFERIEURE */}
-      <footer className="p-3 bg-slate-900/90 border-t border-slate-800/80 backdrop-blur-md safe-bottom">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSendMessage();
-          }}
-          className="flex items-center gap-2"
-        >
-          {/* Bouton Microphone */}
-          <button
-            type="button"
-            onClick={toggleVoiceRecording}
-            className={`p-2.5 rounded-xl border transition flex-shrink-0 ${
-              isRecording
-                ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse'
-                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
-            }`}
-            title={isRecording ? 'Arrêter la dictée' : 'Parler au micro'}
-          >
-            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          </button>
-
-          {/* Champ texte */}
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder={
-              isRecording
-                ? 'Écoute en cours...'
-                : `Discute avec ${profile.name}...`
-            }
-            className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl focus:outline-none focus:border-accent-500 text-sm text-white placeholder-slate-500 transition shadow-inner"
+        {/* ZONE CENTRALE : CHAT STREAM & HUD COCKPIT */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900/30 to-slate-950 relative">
+          {/* Grille d'arrière-plan cockpit subtile */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.03]"
+            style={{
+              backgroundImage: `radial-gradient(circle at 1px 1px, #06b6d4 1px, transparent 0)`,
+              backgroundSize: '24px 24px',
+            }}
           />
 
-          {/* Bouton Envoyer */}
-          <button
-            type="submit"
-            disabled={!inputText.trim() || isLoading}
-            className="p-2.5 rounded-xl bg-accent-600 hover:bg-accent-500 disabled:opacity-40 disabled:hover:bg-accent-600 text-white transition shadow-lg shadow-accent-600/30 flex-shrink-0"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </form>
-      </footer>
+          {/* ZONE DE CHAT SCROLLABLE */}
+          <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 relative z-10">
+            <div className="max-w-4xl mx-auto w-full">
+              {messages.length === 0 ? (
+                /* ACCUEIL HOLOGRAPHIQUE STAR CITIZEN */
+                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 py-6 animate-fade-in space-y-6">
+                  {/* Hologram Avatar Orb */}
+                  <div className="relative">
+                    <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
+                    <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-600/30 via-indigo-600/30 to-purple-600/30 border border-cyan-500/40 flex items-center justify-center text-4xl shadow-2xl shadow-cyan-500/20">
+                      {profile.avatar}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight mb-2">
+                      Système de Bord & Co-Pilote {profile.name}
+                    </h2>
+                    <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                      Contrôle vocal direct de Star Citizen, exécution de macros clavier et analyse IA en temps réel.
+                    </p>
+                  </div>
+
+                  {/* Badges d'état rapide */}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+                      <Zap className="w-3 h-3 text-cyan-400" />
+                      <span>Touches Star Citizen Prêtes</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+                      <Mic className="w-3 h-3 text-emerald-400" />
+                      <span>Reconnaissance Vocale Directe</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+                      <Phone className="w-3 h-3 text-indigo-400" />
+                      <span>Mode Appel Mains-Libres</span>
+                    </div>
+                  </div>
+
+                  {/* Actions Rapides Vocales (Star Citizen Chips) */}
+                  <div className="w-full max-w-lg space-y-2 pt-2">
+                    <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                      Ordres de vol recommandés (cliquez ou dites-les) :
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        {
+                          title: 'Allumer le vaisseau',
+                          prompt: 'Allume le vaisseau',
+                          key: 'U',
+                          icon: Rocket,
+                        },
+                        {
+                          title: "Train d'atterrissage",
+                          prompt: "Rentre le train d'atterrissage",
+                          key: 'N',
+                          icon: Shield,
+                        },
+                        {
+                          title: 'Phares du vaisseau',
+                          prompt: 'Allume les phares',
+                          key: 'L',
+                          icon: Lightbulb,
+                        },
+                        {
+                          title: 'Tour ATC (Atterrissage)',
+                          prompt: "Demande l'atterrissage à la tour",
+                          key: 'ALT+N',
+                          icon: Radio,
+                        },
+                        {
+                          title: 'Carte Stellaire (StarMap)',
+                          prompt: 'Ouvre la carte stellaire',
+                          key: 'F2',
+                          icon: Compass,
+                        },
+                        {
+                          title: 'Moteur Quantique',
+                          prompt: 'Active le mode quantum',
+                          key: 'B',
+                          icon: Zap,
+                        },
+                      ].map((action, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSendMessage(action.prompt)}
+                          className="text-left p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/40 text-xs text-slate-300 transition flex items-center justify-between group shadow-sm"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <action.icon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            <span className="truncate font-medium">{action.prompt}</span>
+                          </div>
+                          <span className="px-1.5 py-0.2 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-cyan-300 shrink-0 ml-1">
+                            {action.key}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* CHAT MESSAGES */
+                messages.map((msg) => {
+                  const isUser = msg.role === 'user';
+                  const isPlayingThis = isPlayingAudio && playingMessageId === msg.id;
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex gap-3 mb-4 animate-fade-in ${
+                        isUser ? 'justify-end' : 'justify-start'
+                      }`}
+                    >
+                      {!isUser && (
+                        <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-base bg-slate-800 border border-slate-700 mt-1 shadow-md">
+                          {profile.avatar}
+                        </div>
+                      )}
+
+                      <div
+                        className={`group relative max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-lg ${
+                          isUser
+                            ? 'bg-gradient-to-br from-cyan-600 to-indigo-600 text-white rounded-br-sm'
+                            : 'bg-slate-900/90 border border-slate-800 text-slate-100 rounded-bl-sm backdrop-blur-md'
+                        }`}
+                      >
+                        <p className="leading-relaxed whitespace-pre-wrap selection:bg-cyan-400/30">
+                          {msg.content}
+                        </p>
+
+                        {/* Actions sous le message compagnon */}
+                        {!isUser && (
+                          <div className="flex items-center justify-between gap-3 mt-2 pt-1.5 border-t border-slate-800/60 text-[11px] text-slate-400">
+                            <button
+                              onClick={() => playSpeech(msg.content, msg.id)}
+                              className={`flex items-center gap-1 hover:text-white transition px-1.5 py-0.5 rounded ${
+                                isPlayingThis ? 'text-cyan-400 font-semibold' : ''
+                              }`}
+                            >
+                              {isPlayingThis ? (
+                                <>
+                                  <Square className="w-3 h-3 text-rose-400" />
+                                  <span>Stop</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="w-3 h-3 text-cyan-400" />
+                                  <span>Écouter</span>
+                                </>
+                              )}
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => copyToClipboard(msg.content, msg.id)}
+                                className="hover:text-white transition p-0.5"
+                                title="Copier"
+                              >
+                                {copiedId === msg.id ? (
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                              <span className="text-[10px] text-slate-500">
+                                {new Date(msg.timestamp).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {isUser && (
+                          <div className="text-[10px] text-cyan-200 text-right mt-1 opacity-80">
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Indicateur de génération */}
+              {isLoading && (
+                <div className="flex gap-3 items-start animate-fade-in mb-4">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base bg-slate-800 border border-slate-700">
+                    {profile.avatar}
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl rounded-bl-sm px-4 py-2.5 flex items-center gap-2 text-slate-400 text-xs">
+                    <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                    <span>{profile.name} analyse les systèmes...</span>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </main>
+
+          {/* BARRE DE SAISIE INFERIEURE FLOTTANTE COCKPIT */}
+          <footer className="p-3 md:p-4 bg-slate-900/90 border-t border-slate-800/90 backdrop-blur-xl safe-bottom shrink-0 relative z-20">
+            <div className="max-w-4xl mx-auto w-full">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+                className="flex items-center gap-2"
+              >
+                {/* Bouton Microphone avec effet sonar */}
+                <button
+                  type="button"
+                  onClick={toggleVoiceRecording}
+                  className={`p-2.5 md:p-3 rounded-xl border transition flex-shrink-0 relative ${
+                    isRecording
+                      ? 'bg-rose-500/20 border-rose-500 text-rose-400 animate-pulse shadow-lg shadow-rose-500/20'
+                      : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                  }`}
+                  title={isRecording ? 'Arrêter la dictée' : 'Parler au micro'}
+                >
+                  {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+
+                {/* Champ de commande */}
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder={
+                      isRecording
+                        ? 'Écoute en cours...'
+                        : `Ordre de vol ou message pour ${profile.name}...`
+                    }
+                    className="w-full px-4 py-2.5 md:py-3 bg-slate-950 border border-slate-700/80 rounded-xl focus:outline-none focus:border-cyan-500 text-sm text-white placeholder-slate-500 transition shadow-inner font-sans"
+                  />
+                </div>
+
+                {/* Bouton Envoyer */}
+                <button
+                  type="submit"
+                  disabled={!inputText.trim() || isLoading}
+                  className="p-2.5 md:p-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:hover:bg-cyan-600 text-white transition shadow-lg shadow-cyan-600/30 flex-shrink-0"
+                  title="Envoyer la commande"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
+          </footer>
+        </div>
+      </div>
 
       {/* Prompt d'installation PWA mobile */}
       <PWAInstallPrompt />
@@ -1151,11 +1445,15 @@ export default function CompanionApp() {
       {/* Modal des Paramètres */}
       <SettingsModal
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          setActiveMacros(macroManager.getMacros());
+        }}
         profile={profile}
         onSaveProfile={(newProf) => {
           setProfile(newProf);
           storage.saveProfile(newProf);
+          setActiveMacros(macroManager.getMacros());
         }}
         memories={memories}
         onUpdateMemories={(newMems) => setMemories(newMems)}
