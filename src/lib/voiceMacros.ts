@@ -506,11 +506,13 @@ export const macroManager = {
   async sendKeyToBridge(
     key: string,
     pressType: 'tap' | 'hold' = 'tap',
-    duration?: number
+    duration?: number,
+    layout?: 'azerty' | 'qwerty'
   ): Promise<{ success: boolean; bridgeUrl: string; error?: string }> {
     const candidateUrls = this.getCandidateUrls();
     const effectiveDuration = duration ?? (pressType === 'hold' ? 1.5 : 0.18);
     const timeoutMs = Math.max(1500, Math.round(effectiveDuration * 1000) + 1500);
+    const activeLayout = layout || (typeof window !== 'undefined' ? (localStorage.getItem('sc_keyboard_layout') as 'azerty' | 'qwerty') || 'azerty' : 'azerty');
 
     for (const url of candidateUrls) {
       try {
@@ -525,6 +527,7 @@ export const macroManager = {
             pressType,
             duration: effectiveDuration,
             durationMs: Math.round(effectiveDuration * 1000),
+            layout: activeLayout,
           }),
           signal: controller.signal,
         });

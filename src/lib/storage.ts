@@ -7,6 +7,7 @@ const KEYS = {
   API_KEY: 'ami_gemini_api_key_v1',
   MESSAGES: 'ami_messages_v1',
   MEMORIES: 'ami_memories_v1',
+  KEYBOARD_LAYOUT: 'sc_keyboard_layout',
 };
 
 export interface FullNovaConfig {
@@ -16,6 +17,7 @@ export interface FullNovaConfig {
   memories: MemoryItem[];
   macros: VoiceMacro[];
   bridgeUrl: string;
+  keyboardLayout?: 'azerty' | 'qwerty';
   savedAt: number;
 }
 
@@ -103,6 +105,17 @@ export const storage = {
     storage.saveMemories(memories);
   },
 
+  getKeyboardLayout(): 'azerty' | 'qwerty' {
+    if (typeof window === 'undefined') return 'azerty';
+    const saved = localStorage.getItem(KEYS.KEYBOARD_LAYOUT);
+    return saved === 'qwerty' ? 'qwerty' : 'azerty';
+  },
+
+  setKeyboardLayout(layout: 'azerty' | 'qwerty'): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(KEYS.KEYBOARD_LAYOUT, layout);
+  },
+
   exportFullConfig(): FullNovaConfig {
     return {
       version: 1,
@@ -111,6 +124,7 @@ export const storage = {
       memories: this.getMemories(),
       macros: macroManager.getMacros(),
       bridgeUrl: macroManager.getBridgeUrl(),
+      keyboardLayout: this.getKeyboardLayout(),
       savedAt: Date.now(),
     };
   },
@@ -132,6 +146,9 @@ export const storage = {
       }
       if (config.bridgeUrl) {
         macroManager.setBridgeUrl(config.bridgeUrl);
+      }
+      if (config.keyboardLayout === 'azerty' || config.keyboardLayout === 'qwerty') {
+        this.setKeyboardLayout(config.keyboardLayout);
       }
       return true;
     } catch (e) {

@@ -28,8 +28,14 @@ try:
 except ImportError:
     ThreadingHTTPServer = HTTPServer
 
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass
+
 PORT = 5005
-CURRENT_VERSION = "1.0.6"
+CURRENT_VERSION = "1.0.7"
 
 def find_root_dir() -> str:
     """Détermine le dossier racine de l'application Nova (dossier contenant Nova-StarCitizen.exe, DEMARRER_NOVA.bat ou package.json)."""
@@ -94,16 +100,50 @@ try:
 except ImportError:
     pass
 
-SCANCODES = {
-    # Lettres
-    'a': 0x1E, 'b': 0x30, 'c': 0x2E, 'd': 0x20, 'e': 0x12, 'f': 0x21,
-    'g': 0x22, 'h': 0x23, 'i': 0x17, 'j': 0x24, 'k': 0x25, 'l': 0x26,
-    'm': 0x32, 'n': 0x31, 'o': 0x18, 'p': 0x19, 'q': 0x10, 'r': 0x13,
-    's': 0x1F, 't': 0x14, 'u': 0x16, 'v': 0x2F, 'w': 0x11, 'x': 0x2D,
-    'y': 0x15, 'z': 0x2C,
-    # Chiffres
-    '1': 0x02, '2': 0x03, '3': 0x04, '4': 0x05, '5': 0x06,
-    '6': 0x07, '7': 0x08, '8': 0x09, '9': 0x0A, '0': 0x0B,
+# Table DirectInput Hardware ScanCodes pour clavier Français AZERTY (ISO 105 touches)
+SCANCODES_AZERTY = {
+    # Lettres rangée 2 (haut) : A Z E R T Y U I O P
+    'a': 0x10, 'z': 0x11, 'e': 0x12, 'r': 0x13, 't': 0x14,
+    'y': 0x15, 'u': 0x16, 'i': 0x17, 'o': 0x18, 'p': 0x19,
+    # Lettres rangée 3 (milieu) : Q S D F G H J K L M
+    'q': 0x1E, 's': 0x1F, 'd': 0x20, 'f': 0x21, 'g': 0x22,
+    'h': 0x23, 'j': 0x24, 'k': 0x25, 'l': 0x26, 'm': 0x27,
+    # Lettres rangée 4 (bas) : W X C V B N
+    'w': 0x2C, 'x': 0x2D, 'c': 0x2E, 'v': 0x2F, 'b': 0x30, 'n': 0x31,
+    # Ponctuation & symboles AZERTY
+    ',': 0x32, ';': 0x33, ':': 0x34, '!': 0x35,
+    '^': 0x1A, '$': 0x1B, 'ù': 0x28, '*': 0x2B, '<': 0x56, '>': 0x56,
+    # Rangée supérieure chiffres / caractères spéciaux
+    '1': 0x02, '&': 0x02,
+    '2': 0x03, 'é': 0x03,
+    '3': 0x04, '"': 0x04,
+    '4': 0x05, "'": 0x05,
+    '5': 0x06, '(': 0x06,
+    '6': 0x07, '-': 0x07,
+    '7': 0x08, 'è': 0x08,
+    '8': 0x09, '_': 0x09,
+    '9': 0x0A, 'ç': 0x0A,
+    '0': 0x0B, 'à': 0x0B,
+    ')': 0x0C, '°': 0x0C,
+    '=': 0x0D, '+': 0x0D,
+    # Pavé numérique (Numpad)
+    'num0': 0x52, 'numpad0': 0x52,
+    'num1': 0x4F, 'numpad1': 0x4F,
+    'num2': 0x50, 'numpad2': 0x50,
+    'num3': 0x51, 'numpad3': 0x51,
+    'num4': 0x4B, 'numpad4': 0x4B,
+    'num5': 0x4C, 'numpad5': 0x4C,
+    'num6': 0x4D, 'numpad6': 0x4D,
+    'num7': 0x47, 'numpad7': 0x47,
+    'num8': 0x48, 'numpad8': 0x48,
+    'num9': 0x49, 'numpad9': 0x49,
+    'numlock': 0x45,
+    'num/': (0x35, True), 'numpad/': (0x35, True),
+    'num*': 0x37, 'numpad*': 0x37,
+    'num-': 0x4A, 'numpad-': 0x4A,
+    'num+': 0x4E, 'numpad+': 0x4E,
+    'numenter': (0x1C, True), 'numpadenter': (0x1C, True),
+    'num.': 0x53, 'numpad.': 0x53, 'numpaddot': 0x53,
     # Touches de fonction
     'f1': 0x3B, 'f2': 0x3C, 'f3': 0x3D, 'f4': 0x3E, 'f5': 0x3F, 'f6': 0x40,
     'f7': 0x41, 'f8': 0x42, 'f9': 0x43, 'f10': 0x44, 'f11': 0x57, 'f12': 0x58,
@@ -118,6 +158,91 @@ SCANCODES = {
     'insert': (0x52, True), 'delete': (0x53, True), 'home': (0x47, True), 'end': (0x4F, True),
     'pageup': (0x49, True), 'pagedown': (0x51, True),
 }
+
+# Table DirectInput Hardware ScanCodes pour clavier Américain QWERTY (ANSI)
+SCANCODES_QWERTY = {
+    # Lettres rangée 2 : Q W E R T Y U I O P
+    'q': 0x10, 'w': 0x11, 'e': 0x12, 'r': 0x13, 't': 0x14,
+    'y': 0x15, 'u': 0x16, 'i': 0x17, 'o': 0x18, 'p': 0x19,
+    # Lettres rangée 3 : A S D F G H J K L ; '
+    'a': 0x1E, 's': 0x1F, 'd': 0x20, 'f': 0x21, 'g': 0x22,
+    'h': 0x23, 'j': 0x24, 'k': 0x25, 'l': 0x26, ';': 0x27, "'": 0x28,
+    # Lettres rangée 4 : Z X C V B N M , . /
+    'z': 0x2C, 'x': 0x2D, 'c': 0x2E, 'v': 0x2F, 'b': 0x30, 'n': 0x31,
+    'm': 0x32, ',': 0x33, '.': 0x34, '/': 0x35,
+    # Chiffres rangée supérieure
+    '1': 0x02, '2': 0x03, '3': 0x04, '4': 0x05, '5': 0x06,
+    '6': 0x07, '7': 0x08, '8': 0x09, '9': 0x0A, '0': 0x0B,
+    '-': 0x0C, '=': 0x0D,
+    # Pavé numérique (Numpad)
+    'num0': 0x52, 'numpad0': 0x52,
+    'num1': 0x4F, 'numpad1': 0x4F,
+    'num2': 0x50, 'numpad2': 0x50,
+    'num3': 0x51, 'numpad3': 0x51,
+    'num4': 0x4B, 'numpad4': 0x4B,
+    'num5': 0x4C, 'numpad5': 0x4C,
+    'num6': 0x4D, 'numpad6': 0x4D,
+    'num7': 0x47, 'numpad7': 0x47,
+    'num8': 0x48, 'numpad8': 0x48,
+    'num9': 0x49, 'numpad9': 0x49,
+    'numlock': 0x45,
+    'num/': (0x35, True), 'numpad/': (0x35, True),
+    'num*': 0x37, 'numpad*': 0x37,
+    'num-': 0x4A, 'numpad-': 0x4A,
+    'num+': 0x4E, 'numpad+': 0x4E,
+    'numenter': (0x1C, True), 'numpadenter': (0x1C, True),
+    'num.': 0x53, 'numpad.': 0x53, 'numpaddot': 0x53,
+    # Touches de fonction
+    'f1': 0x3B, 'f2': 0x3C, 'f3': 0x3D, 'f4': 0x3E, 'f5': 0x3F, 'f6': 0x40,
+    'f7': 0x41, 'f8': 0x42, 'f9': 0x43, 'f10': 0x44, 'f11': 0x57, 'f12': 0x58,
+    # Modificateurs
+    'alt': 0x38, 'lalt': 0x38, 'ralt': (0x38, True),
+    'ctrl': 0x1D, 'lctrl': 0x1D, 'rctrl': (0x1D, True),
+    'shift': 0x2A, 'lshift': 0x2A, 'rshift': 0x36,
+    # Touches spéciales
+    'space': 0x39, 'espace': 0x39, 'tab': 0x0F, 'enter': 0x1C, 'return': 0x1C,
+    'esc': 0x01, 'escape': 0x01, 'backspace': 0x0E,
+    'up': (0x48, True), 'down': (0x50, True), 'left': (0x4B, True), 'right': (0x4D, True),
+    'insert': (0x52, True), 'delete': (0x53, True), 'home': (0x47, True), 'end': (0x4F, True),
+    'pageup': (0x49, True), 'pagedown': (0x51, True),
+}
+
+CURRENT_KEYBOARD_LAYOUT = "azerty"
+
+def get_active_keyboard_layout() -> str:
+    global CURRENT_KEYBOARD_LAYOUT
+    return CURRENT_KEYBOARD_LAYOUT
+
+def set_active_keyboard_layout(layout: str):
+    global CURRENT_KEYBOARD_LAYOUT
+    clean = (layout or "").lower().strip()
+    if clean in ("azerty", "qwerty"):
+        CURRENT_KEYBOARD_LAYOUT = clean
+    sync_pydirectinput_scancodes(CURRENT_KEYBOARD_LAYOUT)
+
+def get_scancode_entry(k: str, layout: str = None):
+    use_layout = layout if layout in ("azerty", "qwerty") else CURRENT_KEYBOARD_LAYOUT
+    table = SCANCODES_AZERTY if use_layout == "azerty" else SCANCODES_QWERTY
+    entry = table.get(k.lower())
+    if entry is not None:
+        return entry
+    fallback_table = SCANCODES_QWERTY if use_layout == "azerty" else SCANCODES_AZERTY
+    return fallback_table.get(k.lower(), 0x16)
+
+def sync_pydirectinput_scancodes(layout_name: str = "azerty"):
+    if not has_directinput:
+        return
+    try:
+        import pydirectinput
+        table = SCANCODES_AZERTY if layout_name.lower() == "azerty" else SCANCODES_QWERTY
+        for k, v in table.items():
+            code = v[0] if isinstance(v, tuple) else v
+            pydirectinput.KEYBOARD_MAPPING[k] = code
+    except Exception as e:
+        print(f"⚠️ [LAYOUT] Erreur synchronisation pydirectinput: {e}")
+
+# Compatibilité descendante
+SCANCODES = SCANCODES_AZERTY
 
 MODIFIER_NAMES = {'alt', 'lalt', 'ralt', 'ctrl', 'lctrl', 'rctrl', 'shift', 'lshift', 'rshift'}
 
@@ -167,7 +292,7 @@ def ensure_star_citizen_focus():
     except Exception:
         pass
 
-def send_directinput_native_key(k: str, key_up: bool = False):
+def send_directinput_native_key(k: str, key_up: bool = False, layout: str = None):
     import ctypes
     PUL = ctypes.POINTER(ctypes.c_ulong)
 
@@ -204,7 +329,7 @@ def send_directinput_native_key(k: str, key_up: bool = False):
     KEYEVENTF_KEYUP = 0x0002
     KEYEVENTF_EXTENDEDKEY = 0x0001
 
-    entry = SCANCODES.get(k)
+    entry = get_scancode_entry(k, layout)
     is_extended = False
     if isinstance(entry, tuple):
         code, is_extended = entry
@@ -246,13 +371,17 @@ def to_pydirectinput_key(k: str) -> str:
     }
     return mapping.get(k, k)
 
-def press_key(key_name: str, duration: float = 0.18):
+def press_key(key_name: str, duration: float = 0.18, layout: str = None):
+    eff_layout = layout.lower() if layout in ("azerty", "qwerty") else CURRENT_KEYBOARD_LAYOUT
+    sync_pydirectinput_scancodes(eff_layout)
     mods, main_key = parse_key_combo(key_name)
     combo_str = '+'.join(mods + [main_key]).upper()
     dur_ms = int(round(duration * 1000))
     duration_label = f" (APPUI LONG {duration:.1f}s)" if duration >= 0.8 else f" (APPUI COURT {dur_ms}ms)"
     heure = time.strftime("%H:%M:%S")
-    print(f"🎮 [{heure}] ORDRE VOCAL ➔ Combinaison : [{combo_str}]{duration_label}")
+    sc_val = get_scancode_entry(main_key, eff_layout)
+    sc_code = sc_val[0] if isinstance(sc_val, tuple) else sc_val
+    print(f"🎮 [{heure}] ORDRE VOCAL [{eff_layout.upper()}] ➔ Combinaison : [{combo_str}] (ScanCode 0x{sc_code:02X}){duration_label}")
 
     # Tenter d'assurer le focus sur Star Citizen
     ensure_star_citizen_focus()
@@ -285,26 +414,26 @@ def press_key(key_name: str, duration: float = 0.18):
                     pydirectinput.keyUp(to_pydirectinput_key(m))
 
                 dur_text = f"{duration:.1f}s" if duration >= 0.8 else f"{dur_ms}ms"
-                print(f"   ✓ [{combo_str}] injectée avec succès (PyDirectInput {dur_text}) !")
+                print(f"   ✓ [{combo_str}] injectée avec succès (PyDirectInput [{eff_layout.upper()}] {dur_text}) !")
                 return
             except Exception as ex:
                 print(f"   ℹ Bascule sur DirectInput natif suite à: {ex}")
 
         # Fallback DirectInput natif Windows (SendInput ScanCodes)
         for m in mods:
-            send_directinput_native_key(m, key_up=False)
+            send_directinput_native_key(m, key_up=False, layout=eff_layout)
         time.sleep(0.02)
 
-        send_directinput_native_key(main_key, key_up=False)
+        send_directinput_native_key(main_key, key_up=False, layout=eff_layout)
         time.sleep(duration)
-        send_directinput_native_key(main_key, key_up=True)
+        send_directinput_native_key(main_key, key_up=True, layout=eff_layout)
         time.sleep(0.02)
 
         for m in reversed(mods):
-            send_directinput_native_key(m, key_up=True)
+            send_directinput_native_key(m, key_up=True, layout=eff_layout)
 
         dur_text = f"{duration:.1f}s" if duration >= 0.8 else f"{dur_ms}ms"
-        print(f"   ✓ [{combo_str}] injectée avec succès (DirectInput Natif Windows {dur_text}) !")
+        print(f"   ✓ [{combo_str}] injectée avec succès (DirectInput Natif Windows [{eff_layout.upper()}] {dur_text}) !")
 
     elif has_pyautogui:
         import pyautogui
@@ -364,30 +493,38 @@ def get_persistent_config_path() -> str:
 
 def load_persistent_config() -> dict:
     config_path = get_persistent_config_path()
+    cfg = {}
     if os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                cfg = json.load(f)
         except Exception as e:
             print(f"[CONFIG] Erreur lecture {config_path}: {e}")
 
     # Fallback : vérifier s'il existe un nova_config.json local
-    local_cfg = os.path.join(BASE_DIR, "nova_config.json")
-    if os.path.exists(local_cfg):
-        try:
-            with open(local_cfg, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+    if not cfg:
+        local_cfg = os.path.join(BASE_DIR, "nova_config.json")
+        if os.path.exists(local_cfg):
+            try:
+                with open(local_cfg, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except Exception:
+                pass
 
-    return {}
+    if isinstance(cfg, dict) and "keyboardLayout" in cfg:
+        set_active_keyboard_layout(cfg["keyboardLayout"])
+
+    return cfg or {}
 
 def save_persistent_config(data: dict) -> bool:
+    if isinstance(data, dict) and "keyboardLayout" in data:
+        set_active_keyboard_layout(data["keyboardLayout"])
     config_path = get_persistent_config_path()
     try:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         print(f"💾 [CONFIG] Configuration utilisateur persistée : {config_path}")
+        return True
     except Exception as e:
         print(f"[CONFIG] Erreur écriture {config_path}: {e}")
         return False
@@ -705,6 +842,7 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                 "name": "Nova Star Citizen Unified Companion",
                 "version": CURRENT_VERSION,
                 "appVersion": CURRENT_VERSION,
+                "keyboardLayout": get_active_keyboard_layout(),
                 "directInput": has_directinput or is_windows,
                 "isAdmin": is_admin_windows(),
                 "configPath": get_persistent_config_path(),
@@ -774,6 +912,7 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                 data = json.loads(body.decode("utf-8"))
                 key = data.get("key", "")
                 press_type = data.get("pressType") or data.get("type", "tap")
+                layout = data.get("layout") or get_active_keyboard_layout()
                 default_dur = 1.5 if press_type in ("hold", "long") else 0.18
                 if "durationMs" in data and data["durationMs"] is not None:
                     try:
@@ -787,7 +926,7 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                         duration = default_dur
 
                 if key:
-                    press_key(key, duration=duration)
+                    press_key(key, duration=duration, layout=layout)
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self._send_cors()
@@ -795,6 +934,7 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({
                         "success": True,
                         "key": key,
+                        "layout": layout,
                         "pressType": press_type,
                         "duration": duration,
                         "durationMs": int(round(duration * 1000))
@@ -885,13 +1025,17 @@ def open_browser():
 
 def run():
     admin_ok = is_admin_windows()
+    cfg = load_persistent_config()
+    layout = cfg.get("keyboardLayout", "azerty") if isinstance(cfg, dict) else "azerty"
+    set_active_keyboard_layout(layout)
 
     print("=" * 68)
     print(f"🚀 NOVA — COMPAGNON STAR CITIZEN TOUT-EN-UN (PORT {PORT}) v{CURRENT_VERSION}")
     print("=" * 68)
     print(f"  ✓ Application & Pont clavier disponibles sur : http://localhost:{PORT}/nova/")
     print(f"  ✓ Dossier des fichiers web : {OUT_DIR}")
-    print(f"  ✓ Frappes DirectInput Star Citizen : {'ACTIF (180ms)' if (has_directinput or is_windows) else 'SIMULATION'}")
+    print(f"  ✓ Disposition Clavier Star Citizen : {CURRENT_KEYBOARD_LAYOUT.upper()} (Touches A, Z, Q, W, M adaptées)")
+    print(f"  ✓ Frappes DirectInput Star Citizen : {'ACTIF' if (has_directinput or is_windows) else 'SIMULATION'}")
     if is_windows:
         if admin_ok:
             print("  ✓ Privilèges Administrateur : ACTIFS (Star Citizen débloqué)")

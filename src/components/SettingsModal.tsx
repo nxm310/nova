@@ -39,6 +39,7 @@ import {
   Zap,
   Clock,
   RefreshCw,
+  Keyboard,
 } from 'lucide-react';
 import { macroManager, VoiceMacro, DEFAULT_VOICE_MACROS } from '@/lib/voiceMacros';
 import { geminiClient } from '@/lib/geminiClient';
@@ -86,6 +87,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [bridgeUrl, setBridgeUrl] = useState<string>('');
   const [bridgeTesting, setBridgeTesting] = useState<boolean>(false);
   const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
+  const [keyboardLayout, setKeyboardLayout] = useState<'azerty' | 'qwerty'>('azerty');
 
   // Formulaire nouvelle macro
   const [newMacroName, setNewMacroName] = useState('');
@@ -116,6 +118,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       audioManager.getWebSpeechVoices().then((v) => setWebVoices(v));
       setMacros(macroManager.getMacros());
       setBridgeUrl(macroManager.getBridgeUrl());
+      setKeyboardLayout(storage.getKeyboardLayout());
       setBridgeStatus(null);
       setEditingMacroId(null);
       setSyncStatus(null);
@@ -124,10 +127,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleSetKeyboardLayout = (layout: 'azerty' | 'qwerty') => {
+    setKeyboardLayout(layout);
+    storage.setKeyboardLayout(layout);
+    storage.pushToBridge(bridgeUrl);
+  };
+
   const handleSave = () => {
     storage.saveApiKey(apiKey);
     macroManager.saveMacros(macros);
     macroManager.setBridgeUrl(bridgeUrl);
+    storage.setKeyboardLayout(keyboardLayout);
     onSaveProfile(formData);
     storage.pushToBridge(bridgeUrl);
     setSaveToast(true);
@@ -160,6 +170,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           setApiKey(storage.getApiKey());
           setMacros(macroManager.getMacros());
           setBridgeUrl(macroManager.getBridgeUrl());
+          setKeyboardLayout(storage.getKeyboardLayout());
           onSaveProfile(newProf);
           storage.pushToBridge(macroManager.getBridgeUrl());
           alert('✓ Configuration importée et synchronisée avec succès !');
@@ -185,6 +196,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setApiKey(storage.getApiKey());
         setMacros(macroManager.getMacros());
         setBridgeUrl(macroManager.getBridgeUrl());
+        setKeyboardLayout(storage.getKeyboardLayout());
         onSaveProfile(newProf);
       }
       setSyncStatus('Fichier persistant synchronisé sur votre PC !');
@@ -204,6 +216,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         if (res.url) {
           setBridgeUrl(res.url);
           macroManager.setBridgeUrl(res.url);
+        }
+        if (res.info?.keyboardLayout) {
+          setKeyboardLayout(res.info.keyboardLayout);
         }
         const adminTag = res.info?.isAdmin ? ' (Admin ✓)' : ' (Non-Admin ⚠️)';
         setBridgeStatus(`connecté${adminTag}`);
@@ -316,7 +331,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     duration?: number
   ) => {
     setTestKeyFeedbackId(macroId);
-    const res = await macroManager.sendKeyToBridge(macroKey, pressType, duration);
+    const res = await macroManager.sendKeyToBridge(macroKey, pressType, duration, keyboardLayout);
     setTimeout(() => setTestKeyFeedbackId(null), 1500);
     if (!res.success) {
       alert("Le pont clavier n'a pas répondu. Vérifiez que DEMARRER_NOVA.bat est bien lancé sur votre PC avec les droits Administrateur.");
@@ -1191,6 +1206,74 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     La fenêtre s&apos;ouvre automatiquement en Administrateur et votre navigateur web s&apos;ouvre sur le compagnon prêt pour Star Citizen !
                   </p>
                 </div>
+              </div>
+
+              {/* Carte Disposition du Clavier Star Citizen (AZERTY / QWERTY) */}
+              <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Keyboard className="w-4 h-4 text-cyan-400" />
+                      <h3 className="font-semibold text-sm text-white">
+                        Disposition du Clavier Star Citizen
+                      </h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold bg-cyan-950 text-cyan-300 border border-cyan-500/30">
+                        {keyboardLayout === 'azerty' ? 'AZERTY (Français)' : 'QWERTY (US)'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {keyboardLayout === 'azerty'
+                        ? "✓ Clavier AZERTY actif : les touches A, Z, Q, W, M et la rangée des chiffres envoient les scan codes DirectInput réels de votre clavier français pour Star Citizen."
+                        : "Clavier QWERTY actif : les touches envoient les scan codes standards américains."}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => handleSetKeyboardLayout('azerty')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        keyboardLayout === 'azerty'
+                          ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      AZERTY (Français)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetKeyboardLayout('qwerty')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        keyboardLayout === 'qwerty'
+                          ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      QWERTY (US)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Badge explicatif des correspondances physiques AZERTY */}
+                {keyboardLayout === 'azerty' && (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-800/60 text-[11px] font-mono">
+                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                      <span className="text-cyan-300 font-bold">[Z]</span> <span className="text-slate-400">Avancer (0x11)</span>
+                    </div>
+                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                      <span className="text-cyan-300 font-bold">[A]</span> <span className="text-slate-400">Strafe G / Roulis (0x10)</span>
+                    </div>
+                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                      <span className="text-cyan-300 font-bold">[Q]</span> <span className="text-slate-400">Touche Q (0x1E)</span>
+                    </div>
+                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                      <span className="text-cyan-300 font-bold">[W]</span> <span className="text-slate-400">Touche W (0x2C)</span>
+                    </div>
+                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                      <span className="text-cyan-300 font-bold">[M]</span> <span className="text-slate-400">Minage / Missile (0x27)</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Liste des Commandes Vocales Configurées */}
