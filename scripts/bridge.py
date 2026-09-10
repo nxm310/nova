@@ -29,7 +29,7 @@ except ImportError:
     ThreadingHTTPServer = HTTPServer
 
 PORT = 5005
-CURRENT_VERSION = "1.0.5"
+CURRENT_VERSION = "1.0.6"
 
 def find_root_dir() -> str:
     """Détermine le dossier racine de l'application Nova (dossier contenant Nova-StarCitizen.exe, DEMARRER_NOVA.bat ou package.json)."""

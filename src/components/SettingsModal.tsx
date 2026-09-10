@@ -1336,45 +1336,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               </div>
 
                               {editMacroPressType === 'tap' && (
-                                <div className="mt-2 p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-500/30 text-xs space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-cyan-300 font-semibold flex items-center gap-1">
-                                      <Zap className="w-3 h-3 text-cyan-400" />
-                                      Durée de l&apos;appui court :
-                                    </span>
-                                    <div className="flex items-center gap-1">
-                                      <input
-                                        type="number"
-                                        min="20"
-                                        max="2000"
-                                        step="10"
-                                        value={editMacroTapDurationMs}
-                                        onChange={(e) =>
-                                          setEditMacroTapDurationMs(
-                                            Math.max(20, parseInt(e.target.value, 10) || 20)
-                                          )
-                                        }
-                                        className="w-16 px-1.5 py-0.5 text-center font-mono text-xs bg-slate-900 border border-cyan-500/50 rounded text-cyan-200 font-bold focus:outline-none focus:border-cyan-400"
-                                      />
-                                      <span className="text-[11px] font-mono text-cyan-400 font-bold">ms</span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1 pt-0.5 overflow-x-auto">
-                                    <span className="text-[9px] text-slate-400 uppercase tracking-wider shrink-0">Paliers :</span>
-                                    {[50, 100, 180, 250, 350, 500].map((ms) => (
-                                      <button
-                                        key={ms}
-                                        type="button"
-                                        onClick={() => setEditMacroTapDurationMs(ms)}
-                                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition shrink-0 ${
-                                          editMacroTapDurationMs === ms
-                                            ? 'bg-cyan-500 text-slate-950 font-bold'
-                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                        }`}
-                                      >
-                                        {ms}ms{ms === 180 ? ' ⭐' : ''}
-                                      </button>
-                                    ))}
+                                <div className="flex items-center gap-1.5 flex-wrap mt-2 p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/30 text-xs">
+                                  <span className="text-[10px] text-cyan-300 shrink-0 font-semibold flex items-center gap-1">
+                                    <Zap className="w-3 h-3 text-cyan-400" />
+                                    Durée de l&apos;appui :
+                                  </span>
+                                  {[50, 100, 180, 250, 300, 500].map((ms) => (
+                                    <button
+                                      key={ms}
+                                      type="button"
+                                      onClick={() => setEditMacroTapDurationMs(ms)}
+                                      className={`px-2 py-0.5 rounded text-[11px] font-mono transition ${
+                                        editMacroTapDurationMs === ms
+                                          ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                                      }`}
+                                    >
+                                      {ms}ms{ms === 180 ? ' (défaut)' : ''}
+                                    </button>
+                                  ))}
+                                  <div className="flex items-center gap-1 ml-auto shrink-0 pl-1.5 border-l border-cyan-500/30">
+                                    <input
+                                      type="number"
+                                      min="20"
+                                      max="2000"
+                                      step="10"
+                                      value={editMacroTapDurationMs}
+                                      onChange={(e) =>
+                                        setEditMacroTapDurationMs(
+                                          Math.max(20, parseInt(e.target.value, 10) || 20)
+                                        )
+                                      }
+                                      className="w-14 px-1.5 py-0.5 text-center font-mono text-[11px] bg-slate-900 border border-cyan-500/50 rounded text-cyan-200 font-bold focus:outline-none focus:border-cyan-400"
+                                      title="Valeur personnalisée en ms"
+                                    />
+                                    <span className="text-[10px] font-mono text-cyan-400 font-bold">ms</span>
                                   </div>
                                 </div>
                               )}
@@ -1681,46 +1677,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
 
                     {newMacroPressType === 'tap' && (
-                      <div className="mt-2 p-2.5 rounded-xl bg-accent-950/30 border border-accent-500/30 text-xs space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-accent-300 flex items-center gap-1">
-                            <Zap className="w-3 h-3 text-accent-400" />
-                            Durée de l&apos;appui court :
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              min="20"
-                              max="2000"
-                              step="10"
-                              value={newMacroTapDurationMs}
-                              onChange={(e) =>
-                                setNewMacroTapDurationMs(
-                                  Math.max(20, parseInt(e.target.value, 10) || 20)
-                                )
-                              }
-                              className="w-16 px-2 py-0.5 text-center font-mono text-xs bg-slate-900 border border-accent-500/40 rounded-lg text-accent-200 font-bold focus:outline-none focus:border-accent-400"
-                            />
-                            <span className="text-[11px] font-mono text-accent-400 font-bold">ms</span>
-                          </div>
-                        </div>
-                        {/* Paliers rapides en millisecondes */}
-                        <div className="flex items-center gap-1.5 pt-0.5 overflow-x-auto">
-                          <span className="text-[10px] text-slate-400 uppercase tracking-wider shrink-0">Préréglages :</span>
-                          {[50, 100, 180, 250, 350, 500].map((ms) => (
-                            <button
-                              key={ms}
-                              type="button"
-                              onClick={() => setNewMacroTapDurationMs(ms)}
-                              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition shrink-0 ${
-                                newMacroTapDurationMs === ms
-                                  ? 'bg-accent-500 text-slate-950 font-bold shadow-sm'
-                                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60'
-                              }`}
-                            >
-                              {ms}ms{ms === 180 ? ' ⭐' : ''}
-                            </button>
-                          ))}
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2 p-2 rounded-xl bg-accent-950/30 border border-accent-500/30 text-xs">
+                        <span className="text-[11px] text-accent-300 shrink-0 font-semibold flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5 text-accent-400" />
+                          Durée de l&apos;appui :
+                        </span>
+                        {[50, 100, 180, 250, 300, 500].map((ms) => (
+                          <button
+                            key={ms}
+                            type="button"
+                            onClick={() => setNewMacroTapDurationMs(ms)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition ${
+                              newMacroTapDurationMs === ms
+                                ? 'bg-accent-500 text-slate-950 font-bold shadow-sm'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            {ms}ms{ms === 180 ? ' (défaut)' : ''}
+                          </button>
+                        ))}
+                        <div className="flex items-center gap-1 ml-auto shrink-0 pl-1.5 border-l border-accent-500/30">
+                          <input
+                            type="number"
+                            min="20"
+                            max="2000"
+                            step="10"
+                            value={newMacroTapDurationMs}
+                            onChange={(e) =>
+                              setNewMacroTapDurationMs(
+                                Math.max(20, parseInt(e.target.value, 10) || 20)
+                              )
+                            }
+                            className="w-14 px-1.5 py-0.5 text-center font-mono text-xs bg-slate-900 border border-accent-500/40 rounded-lg text-accent-200 font-bold focus:outline-none focus:border-accent-400"
+                            title="Valeur personnalisée en millisecondes"
+                          />
+                          <span className="text-[11px] font-mono text-accent-400 font-bold">ms</span>
                         </div>
                       </div>
                     )}
