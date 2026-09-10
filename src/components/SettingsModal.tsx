@@ -53,6 +53,7 @@ interface SettingsModalProps {
   onUpdateMemories: (newMemories: MemoryItem[]) => void;
   onClearHistory: () => void;
   onCheckUpdate?: () => void;
+  currentVersion?: string;
 }
 
 type TabType = 'character' | 'voice' | 'memory' | 'api' | 'macros' | 'backup';
@@ -66,7 +67,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateMemories,
   onClearHistory,
   onCheckUpdate,
+  currentVersion,
 }) => {
+  const displayVersion = currentVersion || APP_VERSION;
   const [activeTab, setActiveTab] = useState<TabType>('character');
   const [formData, setFormData] = useState<CompanionProfile>(profile);
   const [apiKey, setApiKey] = useState<string>('');
@@ -484,12 +487,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-full bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 transition group cursor-pointer"
                 title="Vérifier les mises à jour et synchroniser Nova"
               >
-                <span>v{APP_VERSION}</span>
+                <span>v{displayVersion}</span>
                 <RefreshCw className="w-3 h-3 text-cyan-400 group-hover:rotate-180 transition-transform duration-500" />
               </button>
             ) : (
               <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
-                v{APP_VERSION}
+                v{displayVersion}
               </span>
             )}
           </h2>
@@ -1812,7 +1815,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <h4 className="font-semibold text-xs text-white flex items-center gap-2">
                         <span>Mise à Jour Nova</span>
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                          v{APP_VERSION}
+                          v{displayVersion}
                         </span>
                       </h4>
                       <p className="text-[11px] text-slate-400">

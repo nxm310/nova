@@ -703,6 +703,8 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             info = {
                 "status": "ready",
                 "name": "Nova Star Citizen Unified Companion",
+                "version": CURRENT_VERSION,
+                "appVersion": CURRENT_VERSION,
                 "directInput": has_directinput or is_windows,
                 "isAdmin": is_admin_windows(),
                 "configPath": get_persistent_config_path(),

@@ -73,7 +73,7 @@ export default function CompanionApp() {
 
   // État du Pont Clavier PC (Port 5005)
   const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
-  const [bridgeInfo, setBridgeInfo] = useState<{ url?: string; isAdmin?: boolean; directInput?: boolean } | null>(null);
+  const [bridgeInfo, setBridgeInfo] = useState<{ url?: string; isAdmin?: boolean; directInput?: boolean; version?: string } | null>(null);
 
   // États de la Mise à Jour Automatique 1-Clic
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -155,11 +155,26 @@ export default function CompanionApp() {
       if (!isMounted) return;
       setBridgeConnected(res.online);
       if (res.online && res.info) {
+        const remoteVer = res.info.version || res.info.appVersion;
         setBridgeInfo({
           url: res.url,
           isAdmin: res.info.isAdmin,
           directInput: res.info.directInput,
+          version: remoteVer,
         });
+
+        // Détection de cache obsolète dans le navigateur :
+        // Si le pont PC tourne sur une version différente du bundle local en cache,
+        // forcer immédiatement le rechargement sans cache pour afficher la bonne version !
+        if (remoteVer && remoteVer !== APP_VERSION) {
+          const reloadKey = `nova_cache_refresh_${remoteVer}`;
+          if (typeof window !== 'undefined' && !sessionStorage.getItem(reloadKey)) {
+            sessionStorage.setItem(reloadKey, '1');
+            console.log(`🔄 [NOVA] Version pont PC (${remoteVer}) différente du cache (${APP_VERSION}). Actualisation automatique...`);
+            window.location.href = window.location.pathname + '?v=' + Date.now();
+            return;
+          }
+        }
       } else {
         setBridgeInfo(null);
       }
@@ -905,7 +920,7 @@ export default function CompanionApp() {
                 className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 font-bold transition active:scale-95 group cursor-pointer"
                 title="Cliquer pour synchroniser et vérifier si la version est à jour"
               >
-                <span>v{APP_VERSION}</span>
+                <span>v{bridgeInfo?.version || APP_VERSION}</span>
                 <RefreshCw className={`w-2.5 h-2.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500 ${updateChecking ? 'animate-spin text-cyan-200' : ''}`} />
               </button>
             </div>
@@ -1535,6 +1550,7 @@ export default function CompanionApp() {
           storage.clearMessages();
         }}
         onCheckUpdate={handleCheckUpdate}
+        currentVersion={bridgeInfo?.version || APP_VERSION}
       />
 
       {/* Modal d'Appel Direct Mains-Libres */}
@@ -1619,7 +1635,7 @@ export default function CompanionApp() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-slate-400">Version installée :</span>
                         <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-cyan-300 font-mono text-xs font-bold">
-                          v{APP_VERSION}
+                          v{bridgeInfo?.version || updateInfo?.currentVersion || APP_VERSION}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
