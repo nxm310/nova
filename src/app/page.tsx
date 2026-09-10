@@ -887,9 +887,15 @@ export default function CompanionApp() {
               <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/20 uppercase tracking-wider">
                 {currentPreset?.name.split('&')[0].trim() || 'Co-Pilote'}
               </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-cyan-400 font-bold">
-                v{APP_VERSION}
-              </span>
+              {/* Petit bouton de synchronisation pour voir si la version est à jour */}
+              <button
+                onClick={handleCheckUpdate}
+                className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 font-bold transition active:scale-95 group cursor-pointer"
+                title="Cliquer pour synchroniser et vérifier si la version est à jour"
+              >
+                <span>v{APP_VERSION}</span>
+                <RefreshCw className={`w-2.5 h-2.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500 ${updateChecking ? 'animate-spin text-cyan-200' : ''}`} />
+              </button>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <AudioVisualizer isPlaying={isPlayingAudio} isListening={isRecording} />
@@ -1057,10 +1063,11 @@ export default function CompanionApp() {
           {/* Touche Mise à Jour Automatique 1-Clic */}
           <button
             onClick={handleCheckUpdate}
-            className="p-2 rounded-xl bg-blue-600/15 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 transition"
-            title="Rechercher et installer les mises à jour"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 text-xs font-semibold shadow-sm active:scale-95 transition"
+            title="Rechercher et synchroniser les mises à jour"
           >
-            <RefreshCw className={`w-4 h-4 ${updateChecking ? 'animate-spin text-blue-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-300 shrink-0 ${updateChecking ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Mise à jour</span>
           </button>
 
           {/* Bouton Paramètres */}
@@ -1515,6 +1522,7 @@ export default function CompanionApp() {
           updateMessages([]);
           storage.clearMessages();
         }}
+        onCheckUpdate={handleCheckUpdate}
       />
 
       {/* Modal d'Appel Direct Mains-Libres */}
