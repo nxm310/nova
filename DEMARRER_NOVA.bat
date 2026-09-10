@@ -35,6 +35,10 @@ if exist "Nova-StarCitizen.exe" (
 :: 2. CAS 2 : Lancement depuis le dossier source Git avec dossier scripts
 if exist "scripts\bridge.py" (
     echo [OK] Depot source detecte. Verification de Python...
+    if exist ".git" (
+        echo [SYNC] Synchronisation automatique avec GitHub...
+        git pull origin main --quiet >nul 2>&1
+    )
     python --version >nul 2>&1
     if %errorlevel% neq 0 (
         echo [ERREUR] Python n'est pas installe sur votre ordinateur.

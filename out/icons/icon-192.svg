@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="192" height="192">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4c1d95" />
+      <stop offset="50%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="20" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bg)" />
+  <circle cx="256" cy="256" r="180" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-dasharray="8 8" />
+  <g transform="translate(156, 140)">
+    <polygon points="20,70 60,0 90,60" fill="#f8fafc" opacity="0.9" />
+    <polygon points="180,70 140,0 110,60" fill="#f8fafc" opacity="0.9" />
+    <circle cx="100" cy="115" r="90" fill="#ffffff" filter="url(#glow)" />
+    <circle cx="68" cy="110" r="12" fill="#1e1b4b" />
+    <circle cx="132" cy="110" r="12" fill="#1e1b4b" />
+    <circle cx="72" cy="106" r="4" fill="#ffffff" />
+    <circle cx="136" cy="106" r="4" fill="#ffffff" />
+    <path d="M 80 135 Q 100 155 120 135" fill="none" stroke="#1e1b4b" stroke-width="6" stroke-linecap="round" />
+    <circle cx="50" cy="125" r="10" fill="#f43f5e" opacity="0.4" />
+    <circle cx="150" cy="125" r="10" fill="#f43f5e" opacity="0.4" />
+  </g>
+  <g transform="translate(196, 380)" fill="#ffffff" opacity="0.85">
+    <rect x="0" y="8" width="8" height="24" rx="4" />
+    <rect x="20" y="0" width="8" height="40" rx="4" />
+    <rect x="40" y="12" width="8" height="16" rx="4" />
+    <rect x="60" y="4" width="8" height="32" rx="4" />
+    <rect x="80" y="14" width="8" height="12" rx="4" />
+    <rect x="100" y="2" width="8" height="36" rx="4" />
+    <rect x="120" y="8" width="8" height="24" rx="4" />
+  </g>
+</svg>

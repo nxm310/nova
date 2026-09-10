@@ -29,24 +29,35 @@ except ImportError:
     ThreadingHTTPServer = HTTPServer
 
 PORT = 5005
-CURRENT_VERSION = "1.0.4"
+CURRENT_VERSION = "1.0.5"
+
+def find_root_dir() -> str:
+    """Détermine le dossier racine de l'application Nova (dossier contenant Nova-StarCitizen.exe, DEMARRER_NOVA.bat ou package.json)."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    # Mode script Python (bridge.py se trouve dans scripts/ ou à la racine)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
+    if os.path.exists(os.path.join(parent_dir, "package.json")) or os.path.exists(os.path.join(parent_dir, "DEMARRER_NOVA.bat")):
+        return parent_dir
+    return script_dir
 
 def find_out_dir() -> str:
     """Détermine le dossier des fichiers statiques exportés de l'application."""
+    root = find_root_dir()
     candidates = []
     if getattr(sys, 'frozen', False):
         # Mode binaire autonome PyInstaller (.exe)
-        exe_dir = os.path.dirname(sys.executable)
         meipass = getattr(sys, '_MEIPASS', None)
         if meipass:
             candidates.append(os.path.join(meipass, 'out'))
             candidates.append(meipass)
-        candidates.append(os.path.join(exe_dir, 'out'))
-        candidates.append(os.path.join(exe_dir, '_internal', 'out'))
+        candidates.append(os.path.join(root, '_internal', 'out'))
+        candidates.append(os.path.join(root, 'out'))
     else:
         # Mode script Python direct
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        candidates.append(os.path.join(base_dir, 'out'))
+        candidates.append(os.path.join(root, 'out'))
+        candidates.append(os.path.join(root, '_internal', 'out'))
         candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out'))
         candidates.append(os.path.join(os.getcwd(), 'out'))
 
@@ -60,10 +71,11 @@ def find_out_dir() -> str:
         if os.path.exists(c) and os.path.isdir(c):
             return c
 
-    return candidates[0] if candidates else os.path.join(os.getcwd(), 'out')
+    return os.path.join(root, 'out')
 
+ROOT_DIR = find_root_dir()
 OUT_DIR = find_out_dir()
-BASE_DIR = os.path.dirname(OUT_DIR)
+BASE_DIR = ROOT_DIR
 
 # Détection des modules d'injection clavier
 has_directinput = False
@@ -462,56 +474,133 @@ def check_github_update() -> dict:
         "localCommit": local_commit[:7] if local_commit else ""
     }
 
+def schedule_restart(root_dir: str):
+    """Programme le redémarrage propre de Nova en tâche de fond pour appliquer la mise à jour."""
+    def _do_restart():
+        time.sleep(1.2)
+        staging_dir = os.path.join(root_dir, ".update_staging")
+        if sys.platform == "win32":
+            import tempfile
+            bat_path = os.path.join(tempfile.gettempdir(), "nova_restart_updater.bat")
+            launcher = "Nova-StarCitizen.exe" if getattr(sys, 'frozen', False) else "DEMARRER_NOVA.bat"
+            bat_content = f"""@echo off
+chcp 65001 >nul
+timeout /t 2 /nobreak >nul
+if exist "{staging_dir}" (
+    xcopy /s /e /y /i "{staging_dir}\\*" "{root_dir}\\" >nul 2>&1
+    rmdir /s /q "{staging_dir}" >nul 2>&1
+)
+cd /d "{root_dir}"
+if exist "{launcher}" (
+    start "" "{launcher}"
+) else if exist "DEMARRER_NOVA.bat" (
+    start "" "DEMARRER_NOVA.bat"
+) else if exist "Nova-StarCitizen.exe" (
+    start "" "Nova-StarCitizen.exe"
+)
+exit
+"""
+            try:
+                with open(bat_path, "w", encoding="utf-8") as f:
+                    f.write(bat_content)
+                flags = 0
+                if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+                    flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+                if hasattr(subprocess, "DETACHED_PROCESS"):
+                    flags |= subprocess.DETACHED_PROCESS
+                subprocess.Popen(["cmd.exe", "/c", bat_path], shell=True, creationflags=flags)
+                print("🔄 [RESTART] Script de mise à jour et relance lancé avec succès.")
+            except Exception as be:
+                print(f"⚠️ [RESTART] Erreur script batch : {be}")
+            os._exit(0)
+        else:
+            # macOS / Linux
+            try:
+                cmd = [sys.executable] + sys.argv
+                subprocess.Popen(cmd, cwd=root_dir)
+                print("🔄 [RESTART] Nova redémarré sur macOS / Linux.")
+            except Exception as ex:
+                print(f"⚠️ [RESTART] Erreur relance macOS : {ex}")
+            os._exit(0)
+
+    t = threading.Thread(target=_do_restart, daemon=True)
+    t.start()
+
 def apply_github_update(download_url: str = "") -> dict:
-    """Télécharge la mise à jour depuis GitHub ou exécute git pull."""
-    git_dir = os.path.join(BASE_DIR, ".git")
+    """Télécharge la mise à jour depuis GitHub ou exécute git pull, puis redémarre Nova."""
+    root_dir = find_root_dir()
+    git_dir = os.path.join(root_dir, ".git")
+
+    git_success = False
+    git_msg = ""
     if os.path.exists(git_dir):
         try:
             print("🔄 [MISE À JOUR] Dépôt Git local détecté. Exécution de 'git pull'...")
-            proc = subprocess.run(["git", "pull", "origin", "main"], cwd=BASE_DIR, capture_output=True, text=True, timeout=25)
+            proc = subprocess.run(["git", "pull", "origin", "main"], cwd=root_dir, capture_output=True, text=True, timeout=30)
             if proc.returncode == 0:
                 print(f"✓ [MISE À JOUR] git pull réussi : {proc.stdout.strip()}")
-                return {"success": True, "message": f"Mise à jour Git appliquée avec succès ! ({proc.stdout.strip()})"}
+                git_success = True
+                git_msg = proc.stdout.strip()
             else:
                 print(f"⚠️ [MISE À JOUR] git pull a échoué ({proc.stderr.strip()}), repli sur ZIP...")
         except Exception as ge:
             print(f"⚠️ [MISE À JOUR] git non disponible ({ge}), repli sur ZIP...")
 
-    if not download_url:
-        download_url = "https://github.com/nxm310/nova/releases/download/v1.0.1/Nova-StarCitizen-Windows.zip"
+    if not git_success:
+        if not download_url:
+            download_url = f"https://github.com/nxm310/nova/releases/download/v{CURRENT_VERSION}/Nova-StarCitizen-Windows.zip"
 
-    temp_zip = os.path.join(BASE_DIR, "nova_update_temp.zip")
-    try:
-        print(f"📥 [MISE À JOUR] Téléchargement depuis {download_url}...")
-        req = urllib.request.Request(download_url, headers={"User-Agent": "Nova-Companion-Updater"})
-        with urllib.request.urlopen(req, timeout=45) as response, open(temp_zip, 'wb') as out_file:
-            shutil.copyfileobj(response, out_file)
+        temp_zip = os.path.join(root_dir, "nova_update_temp.zip")
+        staging_dir = os.path.join(root_dir, ".update_staging")
+        try:
+            print(f"📥 [MISE À JOUR] Téléchargement depuis {download_url}...")
+            req = urllib.request.Request(download_url, headers={"User-Agent": "Nova-Companion-Updater"})
+            with urllib.request.urlopen(req, timeout=60) as response, open(temp_zip, 'wb') as out_file:
+                shutil.copyfileobj(response, out_file)
 
-        print("📦 [MISE À JOUR] Extraction des nouveaux fichiers...")
-        with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
-            for member in zip_ref.namelist():
-                if member.startswith("/") or ".." in member:
-                    continue
-                target_path = os.path.join(BASE_DIR, member)
-                if member.endswith('/'):
-                    os.makedirs(target_path, exist_ok=True)
-                else:
-                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                    with zip_ref.open(member) as src, open(target_path, "wb") as dst:
-                        shutil.copyfileobj(src, dst)
+            print("📦 [MISE À JOUR] Extraction des nouveaux fichiers...")
+            if os.path.exists(staging_dir):
+                shutil.rmtree(staging_dir, ignore_errors=True)
+            os.makedirs(staging_dir, exist_ok=True)
 
-        if os.path.exists(temp_zip):
-            os.remove(temp_zip)
+            with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
+                zip_ref.extractall(staging_dir)
 
-        print("✓ [MISE À JOUR] Fichiers mis à jour avec succès !")
-        return {"success": True, "message": "Mise à jour ZIP installée avec succès !"}
-    except Exception as e:
-        print(f"❌ [MISE À JOUR] Erreur : {e}")
-        if os.path.exists(temp_zip):
-            try:
-                os.remove(temp_zip)
-            except Exception:
-                pass
+            if os.path.exists(temp_zip):
+                try:
+                    os.remove(temp_zip)
+                except Exception:
+                    pass
+
+            # Copie immédiate des fichiers statiques d'interface web (fichiers non verrouillés)
+            for sub in [os.path.join("_internal", "out"), "out"]:
+                src_out = os.path.join(staging_dir, sub)
+                if os.path.exists(src_out):
+                    for dst_out in [os.path.join(root_dir, "_internal", "out"), os.path.join(root_dir, "out")]:
+                        try:
+                            shutil.copytree(src_out, dst_out, dirs_exist_ok=True)
+                        except Exception:
+                            pass
+                    print("✓ [MISE À JOUR] Fichiers web mis à jour !")
+                    break
+
+            print("✓ [MISE À JOUR] Archive ZIP extraite avec succès !")
+        except Exception as e:
+            print(f"❌ [MISE À JOUR] Erreur téléchargement/extraction : {e}")
+            if os.path.exists(temp_zip):
+                try:
+                    os.remove(temp_zip)
+                except Exception:
+                    pass
+            return {"success": False, "error": f"Erreur lors de la mise à jour : {e}"}
+
+    # Programmer le redémarrage automatique en tâche de fond
+    schedule_restart(root_dir)
+
+    return {
+        "success": True,
+        "message": f"Mise à jour v{CURRENT_VERSION} appliquée avec succès ! Nova redémarre..."
+    }
 # Cache mémoire pour la synthèse vocale instantanée
 TTS_CACHE = {}
 
@@ -581,6 +670,14 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self._send_cors()
         self.end_headers()
+
+    def end_headers(self):
+        # Éviter la mise en cache de index.html et des pages principales pour actualiser immédiatement les mises à jour
+        if hasattr(self, 'path') and (self.path.endswith('.html') or self.path.endswith('/') or '/nova' in self.path):
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+        super().end_headers()
 
     def translate_path(self, path):
         cleaned = path.split('?')[0].split('#')[0]
@@ -730,11 +827,12 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             except Exception:
                 pass
             res = apply_github_update(dl_url)
-            self.send_response(200 if res.get("success") else 500)
+            ok = bool(res and res.get("success"))
+            self.send_response(200 if ok else 500)
             self.send_header("Content-Type", "application/json")
             self._send_cors()
             self.end_headers()
-            self.wfile.write(json.dumps(res).encode("utf-8"))
+            self.wfile.write(json.dumps(res or {"success": False, "error": "Erreur lors de la mise à jour"}).encode("utf-8"))
             return
 
         if clean in ('/api/tts', '/nova/api/tts', '/tts', '/nova/tts', '/api/tts/google', '/nova/api/tts/google'):

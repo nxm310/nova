@@ -317,10 +317,10 @@ export default function CompanionApp() {
       });
       const data = await res.json();
       if (data.success) {
-        setUpdateToast("✓ Mise à jour appliquée avec succès ! Rechargement en cours...");
+        setUpdateToast(data.message || "✓ Mise à jour appliquée avec succès ! Nova redémarre...");
         setTimeout(() => {
-          window.location.reload();
-        }, 2200);
+          window.location.href = window.location.pathname + '?v=' + Date.now();
+        }, 3200);
       } else {
         alert("Erreur lors de la mise à jour : " + (data.error || 'Échec'));
       }
