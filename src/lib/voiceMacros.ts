@@ -4,8 +4,9 @@ export interface VoiceMacro {
   name: string;
   phrases: string[]; // Phrases déclencheuses (ex: ["demarrer vaisseau", "sort le train"])
   key: string; // Touche à presser (ex: "u", "r", "n", "b", "l", "p", "c", "f1", "f2")
-  pressType?: 'tap' | 'hold'; // 'tap' = appui court (~180ms), 'hold' = appui long (~1.5s)
+  pressType?: 'tap' | 'hold'; // 'tap' = appui court, 'hold' = appui long
   holdDuration?: number; // Durée de l'appui long en secondes (défaut: 1.5)
+  tapDurationMs?: number; // Durée réglable de l'appui court en millisecondes (défaut: 180)
   confirmation: string; // Réponse vocale du compagnon
   enabled: boolean;
 }
@@ -476,10 +477,14 @@ export const macroManager = {
         }
       }
 
-      // S'assurer que toutes les macros ont au moins pressType='tap'
+      // S'assurer que toutes les macros ont au moins pressType='tap' et tapDurationMs=180
       for (const m of parsed) {
         if (!m.pressType) {
           m.pressType = 'tap';
+          updated = true;
+        }
+        if (m.pressType === 'tap' && !m.tapDurationMs) {
+          m.tapDurationMs = 180;
           updated = true;
         }
       }
@@ -519,6 +524,7 @@ export const macroManager = {
             key: key.toLowerCase().trim(),
             pressType,
             duration: effectiveDuration,
+            durationMs: Math.round(effectiveDuration * 1000),
           }),
           signal: controller.signal,
         });
@@ -579,7 +585,15 @@ export const macroManager = {
           .trim();
 
         if (normalized.includes(normPhrase)) {
-          const typeLabel = macro.pressType === 'hold' ? ' [APPUI LONG 1.5s]' : '';
+          const durSec =
+            macro.pressType === 'hold'
+              ? (macro.holdDuration || 1.5)
+              : ((macro.tapDurationMs || 180) / 1000);
+
+          const typeLabel =
+            macro.pressType === 'hold'
+              ? ` [APPUI LONG ${durSec}s]`
+              : ` [APPUI COURT ${macro.tapDurationMs || 180}ms]`;
           console.log(`⚡ Macro vocale détectée : "${macro.name}" ➔ Touche [${macro.key.toUpperCase()}]${typeLabel}`);
 
           // Vérifier si nous sommes sur un site distant HTTPS (GitHub Pages) qui bloque les appels HTTP locaux
@@ -592,11 +606,11 @@ export const macroManager = {
             };
           }
 
-          // Envoi de la touche au pont clavier avec type d'appui et durée
+          // Envoi de la touche au pont clavier avec type d'appui et durée exacte
           const result = await this.sendKeyToBridge(
             macro.key,
             macro.pressType || 'tap',
-            macro.holdDuration
+            durSec
           );
 
           if (!result.success) {

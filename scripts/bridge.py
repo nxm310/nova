@@ -29,7 +29,7 @@ except ImportError:
     ThreadingHTTPServer = HTTPServer
 
 PORT = 5005
-CURRENT_VERSION = "1.0.3"
+CURRENT_VERSION = "1.0.4"
 
 def find_out_dir() -> str:
     """Détermine le dossier des fichiers statiques exportés de l'application."""
@@ -237,7 +237,8 @@ def to_pydirectinput_key(k: str) -> str:
 def press_key(key_name: str, duration: float = 0.18):
     mods, main_key = parse_key_combo(key_name)
     combo_str = '+'.join(mods + [main_key]).upper()
-    duration_label = f" (APPUI LONG {duration:.1f}s)" if duration >= 0.5 else f" (APPUI COURT {duration:.2f}s)"
+    dur_ms = int(round(duration * 1000))
+    duration_label = f" (APPUI LONG {duration:.1f}s)" if duration >= 0.8 else f" (APPUI COURT {dur_ms}ms)"
     heure = time.strftime("%H:%M:%S")
     print(f"🎮 [{heure}] ORDRE VOCAL ➔ Combinaison : [{combo_str}]{duration_label}")
 
@@ -271,7 +272,8 @@ def press_key(key_name: str, duration: float = 0.18):
                 for m in reversed(mods):
                     pydirectinput.keyUp(to_pydirectinput_key(m))
 
-                print(f"   ✓ [{combo_str}] injectée avec succès (PyDirectInput {duration:.2f}s) !")
+                dur_text = f"{duration:.1f}s" if duration >= 0.8 else f"{dur_ms}ms"
+                print(f"   ✓ [{combo_str}] injectée avec succès (PyDirectInput {dur_text}) !")
                 return
             except Exception as ex:
                 print(f"   ℹ Bascule sur DirectInput natif suite à: {ex}")
@@ -289,7 +291,8 @@ def press_key(key_name: str, duration: float = 0.18):
         for m in reversed(mods):
             send_directinput_native_key(m, key_up=True)
 
-        print(f"   ✓ [{combo_str}] injectée avec succès (DirectInput Natif Windows {duration:.2f}s) !")
+        dur_text = f"{duration:.1f}s" if duration >= 0.8 else f"{dur_ms}ms"
+        print(f"   ✓ [{combo_str}] injectée avec succès (DirectInput Natif Windows {dur_text}) !")
 
     elif has_pyautogui:
         import pyautogui
@@ -302,7 +305,8 @@ def press_key(key_name: str, duration: float = 0.18):
         time.sleep(0.02)
         for m in reversed(mods):
             pyautogui.keyUp(m)
-        print(f"   ✓ [{combo_str}] envoyée via PyAutoGUI ({duration:.2f}s).")
+        dur_text = f"{duration:.1f}s" if duration >= 0.8 else f"{dur_ms}ms"
+        print(f"   ✓ [{combo_str}] envoyée via PyAutoGUI ({dur_text}).")
 
     elif sys.platform == "darwin":
         import os
@@ -314,13 +318,15 @@ def press_key(key_name: str, duration: float = 0.18):
             using_clause = "using {control down}"
         elif 'shift' in mods or 'lshift' in mods:
             using_clause = "using {shift down}"
-        if duration >= 0.5:
+        dur_text = f"{duration:.1f}s" if duration >= 0.8 else f"{dur_ms}ms"
+        if duration >= 0.8:
             os.system(f"""osascript -e 'tell application "System Events" to key down "{main_key}"' -e 'delay {duration}' -e 'tell application "System Events" to key up "{main_key}"' 2>/dev/null || true""")
         else:
             os.system(f"""osascript -e 'tell application "System Events" to keystroke "{main_key}" {using_clause}' 2>/dev/null || true""")
-        print(f"   ✓ [{combo_str}] simulée sur macOS ({duration:.2f}s).")
+        print(f"   ✓ [{combo_str}] simulée sur macOS ({dur_text}).")
     else:
-        print(f"   ✓ [{combo_str}] simulation console ({duration:.2f}s).")
+        dur_text = f"{duration:.1f}s" if duration >= 0.8 else f"{dur_ms}ms"
+        print(f"   ✓ [{combo_str}] simulation console ({dur_text}).")
 
 
 def get_persistent_config_path() -> str:
@@ -670,10 +676,16 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                 key = data.get("key", "")
                 press_type = data.get("pressType") or data.get("type", "tap")
                 default_dur = 1.5 if press_type in ("hold", "long") else 0.18
-                try:
-                    duration = float(data.get("duration", default_dur))
-                except (ValueError, TypeError):
-                    duration = default_dur
+                if "durationMs" in data and data["durationMs"] is not None:
+                    try:
+                        duration = float(data["durationMs"]) / 1000.0
+                    except (ValueError, TypeError):
+                        duration = default_dur
+                else:
+                    try:
+                        duration = float(data.get("duration", default_dur))
+                    except (ValueError, TypeError):
+                        duration = default_dur
 
                 if key:
                     press_key(key, duration=duration)
@@ -685,7 +697,8 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                         "success": True,
                         "key": key,
                         "pressType": press_type,
-                        "duration": duration
+                        "duration": duration,
+                        "durationMs": int(round(duration * 1000))
                     }).encode("utf-8"))
                     return
             except Exception as e:

@@ -590,8 +590,12 @@ export default function CompanionApp() {
         const keyToPress = actionMatch[2];
         const isHold = actionType === 'HOLD';
         displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
-        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? 'APPUI LONG 1.5s' : 'APPUI COURT'}) ➔ Envoi au pont PC...`);
-        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', isHold ? 1.5 : 0.18);
+        const matchingMacro = macroManager.getMacros().find(m => m.key.toLowerCase() === keyToPress.toLowerCase());
+        const durSec = isHold
+          ? (matchingMacro?.holdDuration || 1.5)
+          : ((matchingMacro?.tapDurationMs || 180) / 1000);
+        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? `APPUI LONG ${durSec}s` : `APPUI COURT ${Math.round(durSec * 1000)}ms`}) ➔ Envoi au pont PC...`);
+        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', durSec);
       }
 
       const botMessage: ChatMessage = {
@@ -733,8 +737,12 @@ export default function CompanionApp() {
         const keyToPress = actionMatch[2];
         const isHold = actionType === 'HOLD';
         displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
-        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? 'APPUI LONG 1.5s' : 'APPUI COURT'}) ➔ Envoi au pont PC...`);
-        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', isHold ? 1.5 : 0.18);
+        const matchingMacro = macroManager.getMacros().find(m => m.key.toLowerCase() === keyToPress.toLowerCase());
+        const durSec = isHold
+          ? (matchingMacro?.holdDuration || 1.5)
+          : ((matchingMacro?.tapDurationMs || 180) / 1000);
+        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? `APPUI LONG ${durSec}s` : `APPUI COURT ${Math.round(durSec * 1000)}ms`}) ➔ Envoi au pont PC...`);
+        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', durSec);
       }
 
       const botMessage: ChatMessage = {
@@ -811,7 +819,11 @@ export default function CompanionApp() {
   const handleDeckTrigger = async (macro: VoiceMacro) => {
     setDeckFeedbackKey(macro.id);
     try {
-      await macroManager.sendKeyToBridge(macro.key, macro.pressType, macro.holdDuration);
+      const durSec =
+        macro.pressType === 'hold'
+          ? (macro.holdDuration || 1.5)
+          : ((macro.tapDurationMs || 180) / 1000);
+      await macroManager.sendKeyToBridge(macro.key, macro.pressType, durSec);
       if (profile.autoPlayVoice) {
         playSpeech(`Action ${macro.name}`);
       }
