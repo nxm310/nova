@@ -9,6 +9,7 @@ export interface VoiceMacro {
   tapDurationMs?: number; // Durée réglable de l'appui court en millisecondes (défaut: 180)
   confirmation: string; // Réponse vocale du compagnon
   enabled: boolean;
+  tested?: boolean; // Indique si la commande a été testée et validée en jeu par l'utilisateur
 }
 
 export const DEFAULT_VOICE_MACROS: VoiceMacro[] = [

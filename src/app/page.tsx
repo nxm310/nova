@@ -107,8 +107,8 @@ export default function CompanionApp() {
   const [isCallMuted, setIsCallMuted] = useState<boolean>(false);
   const isCallMutedRef = useRef(false);
 
-  // États du Cockpit Touch Deck
-  const [isDeckOpen, setIsDeckOpen] = useState(true);
+  // États du Cockpit Touch Deck (fermé par défaut à l'allumage)
+  const [isDeckOpen, setIsDeckOpen] = useState(false);
   const [deckFeedbackKey, setDeckFeedbackKey] = useState<string | null>(null);
   const [activeMacros, setActiveMacros] = useState<VoiceMacro[]>([]);
   const [deckCategory, setDeckCategory] = useState<'all' | 'flight' | 'systems' | 'hud'>('all');
@@ -925,22 +925,22 @@ export default function CompanionApp() {
 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-slate-950 text-slate-100 overflow-hidden relative selection:bg-cyan-500/30">
-      {/* HEADER COCKPIT ÉPURÉ & ÉQUILIBRÉ */}
-      <header className="flex items-center justify-between px-3 md:px-6 py-2.5 bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-xl z-30 safe-top select-none shrink-0 gap-2">
+      {/* HEADER COCKPIT ÉPURÉ, UNIFORME & ÉQUILIBRÉ */}
+      <header className="flex items-center justify-between px-3 md:px-5 py-2 bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-xl z-30 safe-top select-none shrink-0 gap-2">
         {/* Section GAUCHE : Identité Co-Pilote & Pont PC */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative shrink-0">
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl bg-gradient-to-br from-cyan-500/20 to-indigo-600/30 border transition-all duration-300 ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg bg-gradient-to-br from-cyan-500/20 to-indigo-600/30 border transition-all duration-300 ${
                 isPlayingAudio
                   ? 'border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-500/20 scale-105'
-                  : 'border-slate-700'
+                  : 'border-slate-700/80'
               }`}
             >
               {profile.avatar}
             </div>
             <span
-              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-950 ${
+              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${
                 isPlayingAudio
                   ? 'bg-cyan-400 animate-pulse'
                   : isRecording
@@ -951,27 +951,29 @@ export default function CompanionApp() {
           </div>
 
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="font-bold text-sm md:text-base text-white tracking-tight truncate">
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-bold text-sm text-white tracking-tight truncate">
                 {profile.name}
               </h1>
               <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/20 uppercase tracking-wider">
                 {currentPreset?.name.split('&')[0].trim() || 'Co-Pilote'}
               </span>
-              {/* Petit bouton de synchronisation pour voir si la version est à jour */}
+              {/* Bouton de synchronisation et vérification de version */}
               <button
+                type="button"
                 onClick={handleCheckUpdate}
-                className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 font-bold transition active:scale-95 group cursor-pointer"
-                title="Cliquer pour synchroniser et vérifier si la version est à jour"
+                className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 font-bold transition active:scale-95 group cursor-pointer"
+                title="Cliquer pour vérifier si la version est à jour"
               >
                 <span>v{bridgeInfo?.version || APP_VERSION}</span>
                 <RefreshCw className={`w-2.5 h-2.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500 ${updateChecking ? 'animate-spin text-cyan-200' : ''}`} />
               </button>
             </div>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-1.5 mt-0.5">
               <AudioVisualizer isPlaying={isPlayingAudio} isListening={isRecording} />
               {/* Statut Pont PC Clavier */}
               <button
+                type="button"
                 onClick={() => setIsSettingsOpen(true)}
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono border transition ${
                   bridgeConnected === true
@@ -1007,15 +1009,16 @@ export default function CompanionApp() {
           </div>
         </div>
 
-        {/* Section CENTRE : Actions Principales Cockpit */}
-        <div className="flex items-center gap-1.5 md:gap-2">
+        {/* Section CENTRE : Actions Principales Cockpit (hauteur uniforme h-9) */}
+        <div className="flex items-center gap-1.5">
           {/* Bascule Cockpit Touch Deck (Sidebar) */}
           <button
+            type="button"
             onClick={() => setIsDeckOpen(!isDeckOpen)}
-            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-sm transition active:scale-95 ${
+            className={`h-9 px-2.5 sm:px-3 rounded-xl border text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5 ${
               isDeckOpen
-                ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-cyan-500/10'
-                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-200 shadow-cyan-500/15'
+                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700/80 text-slate-300'
             }`}
             title={isDeckOpen ? 'Masquer le Touch Deck des touches' : 'Afficher le Touch Deck des touches Star Citizen'}
           >
@@ -1028,8 +1031,9 @@ export default function CompanionApp() {
 
           {/* Bouton Appel Direct Mains-Libres */}
           <button
+            type="button"
             onClick={startHandsFreeCall}
-            className="flex items-center gap-1.5 px-3 md:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/20 active:scale-95 transition"
+            className="h-9 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/20 active:scale-95 transition flex items-center gap-1.5"
             title="Démarrer un appel vocal direct sans avoir à appuyer sur les boutons"
           >
             <Phone className="w-3.5 h-3.5 text-cyan-200 animate-pulse" />
@@ -1039,11 +1043,12 @@ export default function CompanionApp() {
 
           {/* Bouton Partage / Vision Écran */}
           <button
+            type="button"
             onClick={handleToggleVision}
-            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-sm active:scale-95 transition ${
+            className={`h-9 px-2.5 sm:px-3 rounded-xl border text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5 ${
               isVisionActive
                 ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20 animate-pulse'
-                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700/80 text-slate-300'
             }`}
             title={
               isVisionActive
@@ -1062,20 +1067,21 @@ export default function CompanionApp() {
           </button>
         </div>
 
-        {/* Section DROITE : Utilitaires & Configuration */}
-        <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
+        {/* Section DROITE : Utilitaires & Configuration (hauteur uniforme h-9) */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Bascule lecture auto voix */}
           <button
+            type="button"
             onClick={() => {
               const updated = { ...profile, autoPlayVoice: !profile.autoPlayVoice };
               setProfile(updated);
               storage.saveProfile(updated);
             }}
-            title={profile.autoPlayVoice ? 'Voix activée' : 'Voix coupée'}
-            className={`p-2 rounded-xl border transition ${
+            title={profile.autoPlayVoice ? 'Voix activée (cliquer pour couper)' : 'Voix coupée (cliquer pour activer)'}
+            className={`w-9 h-9 rounded-xl border transition active:scale-95 flex items-center justify-center ${
               profile.autoPlayVoice
-                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
-                : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25'
+                : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800'
             }`}
           >
             {profile.autoPlayVoice ? (
@@ -1087,6 +1093,7 @@ export default function CompanionApp() {
 
           {/* Bouton Effacer la conversation */}
           <button
+            type="button"
             onClick={() => {
               if (messages.length === 0) return;
               if (window.confirm("Effacer les messages affichés à l'écran ?")) {
@@ -1101,17 +1108,16 @@ export default function CompanionApp() {
                 ? "Effacer les messages affichés à l'écran"
                 : "Aucun message à effacer"
             }
-            className="p-2 rounded-xl bg-slate-800/60 hover:bg-red-500/20 hover:border-red-500/40 border border-slate-700/60 text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:hover:bg-slate-800/60 disabled:hover:text-slate-400 disabled:cursor-not-allowed transition"
+            className="w-9 h-9 rounded-xl bg-slate-800/60 hover:bg-red-500/20 hover:border-red-500/40 border border-slate-700/60 text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:hover:bg-slate-800/60 disabled:hover:text-slate-400 disabled:cursor-not-allowed transition active:scale-95 flex items-center justify-center"
           >
             <Trash2 className="w-4 h-4" />
           </button>
 
-          <div className="h-4 w-px bg-slate-800 hidden sm:block mx-0.5" />
-
           {/* Touche Sauvegarde Rapide */}
           <button
+            type="button"
             onClick={handleQuickSave}
-            className="p-2 rounded-xl bg-purple-600/15 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 transition"
+            className="hidden sm:flex w-9 h-9 rounded-xl bg-purple-600/15 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 transition active:scale-95 items-center justify-center"
             title="Sauvegarder mes réglages (touches, profil, clé API) dans un fichier .json"
           >
             <Save className="w-4 h-4" />
@@ -1119,7 +1125,7 @@ export default function CompanionApp() {
 
           {/* Touche Restauration Rapide */}
           <label
-            className="p-2 rounded-xl bg-cyan-600/15 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 transition cursor-pointer"
+            className="hidden sm:flex w-9 h-9 rounded-xl bg-cyan-600/15 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 transition active:scale-95 cursor-pointer items-center justify-center"
             title="Restaurer mes réglages depuis un fichier de sauvegarde (.json)"
           >
             <FolderOpen className="w-4 h-4" />
@@ -1131,10 +1137,13 @@ export default function CompanionApp() {
             />
           </label>
 
+          <div className="h-4 w-px bg-slate-800 hidden sm:block mx-0.5" />
+
           {/* Touche Mise à Jour Automatique 1-Clic */}
           <button
+            type="button"
             onClick={handleCheckUpdate}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 text-xs font-semibold shadow-sm active:scale-95 transition"
+            className="h-9 px-2.5 sm:px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5"
             title="Rechercher et synchroniser les mises à jour"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-blue-300 shrink-0 ${updateChecking ? 'animate-spin' : ''}`} />
@@ -1143,8 +1152,9 @@ export default function CompanionApp() {
 
           {/* Bouton Paramètres */}
           <button
+            type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 transition"
+            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-200 transition active:scale-95 flex items-center justify-center"
             title="Paramètres de Nova & Touches"
           >
             <Settings className="w-4 h-4" />

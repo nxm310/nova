@@ -90,6 +90,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [keyboardLayout, setKeyboardLayout] = useState<'azerty' | 'qwerty'>('azerty');
 
   // Formulaire nouvelle macro
+  const [isAddMacroOpen, setIsAddMacroOpen] = useState<boolean>(false);
   const [newMacroName, setNewMacroName] = useState('');
   const [newMacroKey, setNewMacroKey] = useState('');
   const [newMacroPressType, setNewMacroPressType] = useState<'tap' | 'hold'>('tap');
@@ -121,6 +122,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setKeyboardLayout(storage.getKeyboardLayout());
       setBridgeStatus(null);
       setEditingMacroId(null);
+      setIsAddMacroOpen(false);
       setSyncStatus(null);
     }
   }, [isOpen, profile]);
@@ -357,6 +359,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       phrases: phrases.length > 0 ? phrases : [newMacroName.trim().toLowerCase()],
       confirmation: newMacroReply.trim() || `Commande ${newMacroName.trim()} exécutée.`,
       enabled: true,
+      tested: false, // Nouvelle commande à tester en jeu
     };
 
     const updated = [...macros, newM];
@@ -371,6 +374,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setNewMacroTapDurationMs(180);
     setNewMacroPhrases('');
     setNewMacroReply('');
+    setIsAddMacroOpen(false); // Refermer le formulaire après ajout
   };
 
   const handleDeleteMacro = (id: string) => {
@@ -383,6 +387,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleToggleMacro = (id: string) => {
     const updated = macros.map((m) => (m.id === id ? { ...m, enabled: !m.enabled } : m));
+    setMacros(updated);
+    macroManager.saveMacros(updated);
+    storage.pushToBridge(bridgeUrl);
+  };
+
+  const handleToggleMacroTested = (id: string) => {
+    const updated = macros.map((m) => (m.id === id ? { ...m, tested: !m.tested } : m));
     setMacros(updated);
     macroManager.saveMacros(updated);
     storage.pushToBridge(bridgeUrl);
@@ -522,74 +533,82 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-slate-800 bg-slate-950/50 px-2 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('character')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeTab === 'character'
-                ? 'border-accent-500 text-accent-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            Caractère
-          </button>
-          <button
-            onClick={() => setActiveTab('voice')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeTab === 'voice'
-                ? 'border-accent-500 text-accent-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Volume2 className="w-4 h-4" />
-            Voix & Audio
-          </button>
-          <button
-            onClick={() => setActiveTab('memory')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeTab === 'memory'
-                ? 'border-accent-500 text-accent-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Brain className="w-4 h-4" />
-            Mémoire ({memories.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('api')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeTab === 'api'
-                ? 'border-accent-500 text-accent-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Key className="w-4 h-4" />
-            Clé API
-          </button>
-          <button
-            onClick={() => setActiveTab('macros')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeTab === 'macros'
-                ? 'border-accent-500 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Gamepad2 className="w-4 h-4 text-cyan-400" />
-            Touches Star Citizen ({macros.filter((m) => m.enabled).length})
-          </button>
-          <button
-            onClick={() => setActiveTab('backup')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeTab === 'backup'
-                ? 'border-accent-500 text-purple-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <HardDrive className="w-4 h-4 text-purple-400" />
-            Sauvegarde & Mises à jour
-          </button>
+        {/* Navigation Onglets sur 2 lignes — Accès direct sans scroll horizontal */}
+        <div className="p-2 border-b border-slate-800 bg-slate-950/80">
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('character')}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl transition text-center ${
+                activeTab === 'character'
+                  ? 'bg-accent-600/30 text-accent-300 border border-accent-500/60 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/80'
+              }`}
+            >
+              <User className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Caractère</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('voice')}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl transition text-center ${
+                activeTab === 'voice'
+                  ? 'bg-accent-600/30 text-accent-300 border border-accent-500/60 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/80'
+              }`}
+            >
+              <Volume2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Voix & Audio</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('memory')}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl transition text-center ${
+                activeTab === 'memory'
+                  ? 'bg-accent-600/30 text-accent-300 border border-accent-500/60 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/80'
+              }`}
+            >
+              <Brain className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Mémoire ({memories.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('api')}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl transition text-center ${
+                activeTab === 'api'
+                  ? 'bg-accent-600/30 text-accent-300 border border-accent-500/60 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/80'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Clé API</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('macros')}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl transition text-center ${
+                activeTab === 'macros'
+                  ? 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/60 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/80'
+              }`}
+            >
+              <Gamepad2 className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+              <span className="truncate">Touches SC ({macros.filter((m) => m.enabled).length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('backup')}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl transition text-center ${
+                activeTab === 'backup'
+                  ? 'bg-purple-600/30 text-purple-300 border border-purple-500/60 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/80'
+              }`}
+            >
+              <HardDrive className="w-3.5 h-3.5 shrink-0 text-purple-400" />
+              <span className="truncate">Sauvegarde & Maj</span>
+            </button>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -1274,21 +1293,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
                 )}
+
+                {/* Bouton dédié pour ouvrir le formulaire d'assignation */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 flex-wrap gap-2">
+                  <span className="text-xs text-slate-400">
+                    Besoin d&apos;assigner une nouvelle touche pour un ordre vocal ?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddMacroOpen(!isAddMacroOpen)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-md ${
+                      isAddMacroOpen
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                        : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-600/30'
+                    }`}
+                  >
+                    <Plus className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMacroOpen ? 'rotate-45' : ''}`} />
+                    <span>{isAddMacroOpen ? 'Masquer le formulaire' : 'Ajouter une commande'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Liste des Commandes Vocales Configurées */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Commandes vocales actives ({macros.length})
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleResetDefaultMacros}
-                    className="text-[11px] text-slate-400 hover:text-slate-200 underline transition"
-                  >
-                    Rétablir valeurs d&apos;origine
-                  </button>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Commandes vocales actives ({macros.length})
+                    </label>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium">
+                      {macros.filter((m) => m.tested).length} validée(s) en jeu
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddMacroOpen(!isAddMacroOpen)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm ${
+                        isAddMacroOpen
+                          ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                          : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-600/30'
+                      }`}
+                    >
+                      <Plus className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMacroOpen ? 'rotate-45' : ''}`} />
+                      <span>{isAddMacroOpen ? 'Fermer formulaire' : 'Ajouter une commande'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetDefaultMacros}
+                      className="text-[11px] text-slate-400 hover:text-slate-200 underline transition"
+                    >
+                      Rétablir défaut
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
@@ -1572,15 +1629,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               </span>
                             </div>
 
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold text-white flex items-center gap-2">
-                                <span>{m.name}</span>
-                                {!m.enabled && (
-                                  <span className="text-[10px] text-slate-500 font-normal">
-                                    (Désactivée)
-                                  </span>
-                                )}
-                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                                  <span>{m.name}</span>
+                                  {/* Badge / Bouton de validation Fonctionne / À tester */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleMacroTested(m.id)}
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                      m.tested
+                                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 shadow-sm shadow-emerald-500/10'
+                                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
+                                    }`}
+                                    title={
+                                      m.tested
+                                        ? 'Validé en jeu : cette commande vocale fonctionne ! Cliquez pour repasser en "À tester".'
+                                        : 'À tester en jeu : cliquez ici une fois que vous avez testé dans Star Citizen pour valider qu\'elle fonctionne.'
+                                    }
+                                  >
+                                    {m.tested ? (
+                                      <>
+                                        <Check className="w-3 h-3 text-emerald-400" />
+                                        <span>Fonctionne ✓</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                        <span>À tester</span>
+                                      </>
+                                    )}
+                                  </button>
+                                  {!m.enabled && (
+                                    <span className="text-[10px] text-slate-500 font-normal">
+                                      (Désactivée)
+                                    </span>
+                                  )}
+                                </div>
                               <div className="text-[11px] text-slate-400 truncate mt-0.5">
                                 🗣️ {m.phrases.join(' • ')}
                               </div>
@@ -1649,15 +1733,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Formulaire d'ajout d'une nouvelle commande vocale */}
-              <form
-                onSubmit={handleAddCustomMacro}
-                className="p-4 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-3"
-              >
-                <div className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5 text-accent-400" />
-                  <span>Assigner une nouvelle touche à un ordre verbal</span>
-                </div>
+              {/* Formulaire escamotable d'ajout d'une nouvelle commande vocale */}
+              {isAddMacroOpen && (
+                <form
+                  onSubmit={handleAddCustomMacro}
+                  className="p-4 bg-slate-900/95 border border-cyan-500/40 rounded-2xl space-y-3 animate-fade-in shadow-xl shadow-cyan-950/40"
+                >
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <div className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Assigner une nouvelle touche à un ordre verbal</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddMacroOpen(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                      title="Fermer le formulaire"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1873,16 +1968,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </span>
                   </button>
                   <button
+                    type="button"
+                    onClick={() => setIsAddMacroOpen(false)}
+                    className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition shrink-0"
+                  >
+                    Annuler
+                  </button>
+                  <button
                     type="submit"
                     disabled={!newMacroName.trim() || !newMacroKey.trim() || !newMacroPhrases.trim()}
-                    className="flex-1 py-2.5 bg-accent-600 hover:bg-accent-500 disabled:opacity-40 disabled:hover:bg-accent-600 text-white font-semibold rounded-xl text-xs transition active:scale-95 shadow-md shadow-accent-600/30"
+                    className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:hover:bg-cyan-600 text-white font-semibold rounded-xl text-xs transition active:scale-95 shadow-md shadow-cyan-600/30"
                   >
                     Ajouter cette commande vocale
                   </button>
                 </div>
               </form>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
           {/* TAB 6: SAUVEGARDE & MISES À JOUR */}
           {activeTab === 'backup' && (

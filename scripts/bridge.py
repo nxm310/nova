@@ -35,7 +35,7 @@ except Exception:
     pass
 
 PORT = 5005
-CURRENT_VERSION = "1.0.8"
+CURRENT_VERSION = "1.0.9"
 
 def find_root_dir() -> str:
     """Détermine le dossier racine de l'application Nova (dossier contenant Nova-StarCitizen.exe, DEMARRER_NOVA.bat ou package.json)."""
