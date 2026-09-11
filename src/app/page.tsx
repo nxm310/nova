@@ -634,20 +634,26 @@ export default function CompanionApp() {
         imageBase64,
       });
 
-      // Détection et déclenchement des actions Star Citizen de l'IA via le pont clavier (Appui court ou Appui long)
-      const actionMatch = botReply.match(/\[ACTION:(KEY|HOLD):([a-zA-Z0-9+_]+)\]/i);
-      let displayReply = botReply;
-      if (actionMatch) {
-        const actionType = actionMatch[1].toUpperCase();
-        const keyToPress = actionMatch[2];
-        const isHold = actionType === 'HOLD';
-        displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
-        const matchingMacro = macroManager.getMacros().find(m => m.key.toLowerCase() === keyToPress.toLowerCase());
-        const durSec = isHold
-          ? (matchingMacro?.holdDuration || 1.5)
-          : ((matchingMacro?.tapDurationMs || 180) / 1000);
-        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? `APPUI LONG ${durSec}s` : `APPUI COURT ${Math.round(durSec * 1000)}ms`}) ➔ Envoi au pont PC...`);
-        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', durSec);
+      // Détection et déclenchement de TOUTES les actions Star Citizen de l'IA (actions simples ou multiples)
+      const actionMatches = Array.from(botReply.matchAll(/\[ACTION:(KEY|HOLD):([a-zA-Z0-9+_]+)\]/gi));
+      let displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
+
+      if (actionMatches.length > 0) {
+        const actionsToExecute = actionMatches.map(m => {
+          const actionType = m[1].toUpperCase();
+          const keyToPress = m[2];
+          const isHold = actionType === 'HOLD';
+          const matchingMacro = macroManager.getMacros().find(mac => mac.key.toLowerCase() === keyToPress.toLowerCase());
+          const durSec = isHold
+            ? (matchingMacro?.holdDuration || 1.5)
+            : ((matchingMacro?.tapDurationMs || 180) / 1000);
+          return { key: keyToPress, pressType: (isHold ? 'hold' : 'tap') as 'hold' | 'tap', duration: durSec };
+        });
+
+        console.log(`🎮 [ACTIONS IA STAR CITIZEN] ${actionsToExecute.length} action(s) détectée(s) :`, actionsToExecute.map(a => `[${a.key.toUpperCase()}] (${a.pressType})`).join(', '));
+        macroManager.sendSequenceToBridge(actionsToExecute).catch(err => {
+          console.warn('Erreur envoi séquence touches IA:', err);
+        });
       }
 
       const botMessage: ChatMessage = {
@@ -788,20 +794,26 @@ export default function CompanionApp() {
         imageBase64,
       });
 
-      // Détection et exécution des actions Star Citizen de l'IA via le pont clavier (Appui court ou Appui long)
-      const actionMatch = botReply.match(/\[ACTION:(KEY|HOLD):([a-zA-Z0-9+_]+)\]/i);
-      let displayReply = botReply;
-      if (actionMatch) {
-        const actionType = actionMatch[1].toUpperCase();
-        const keyToPress = actionMatch[2];
-        const isHold = actionType === 'HOLD';
-        displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
-        const matchingMacro = macroManager.getMacros().find(m => m.key.toLowerCase() === keyToPress.toLowerCase());
-        const durSec = isHold
-          ? (matchingMacro?.holdDuration || 1.5)
-          : ((matchingMacro?.tapDurationMs || 180) / 1000);
-        console.log(`🎮 [ACTION IA STAR CITIZEN] Touche détectée : [${keyToPress}] (${isHold ? `APPUI LONG ${durSec}s` : `APPUI COURT ${Math.round(durSec * 1000)}ms`}) ➔ Envoi au pont PC...`);
-        macroManager.sendKeyToBridge(keyToPress, isHold ? 'hold' : 'tap', durSec);
+      // Détection et exécution de TOUTES les actions Star Citizen de l'IA (actions simples ou multiples)
+      const actionMatches = Array.from(botReply.matchAll(/\[ACTION:(KEY|HOLD):([a-zA-Z0-9+_]+)\]/gi));
+      let displayReply = botReply.replace(/\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\]/gi, '').trim();
+
+      if (actionMatches.length > 0) {
+        const actionsToExecute = actionMatches.map(m => {
+          const actionType = m[1].toUpperCase();
+          const keyToPress = m[2];
+          const isHold = actionType === 'HOLD';
+          const matchingMacro = macroManager.getMacros().find(mac => mac.key.toLowerCase() === keyToPress.toLowerCase());
+          const durSec = isHold
+            ? (matchingMacro?.holdDuration || 1.5)
+            : ((matchingMacro?.tapDurationMs || 180) / 1000);
+          return { key: keyToPress, pressType: (isHold ? 'hold' : 'tap') as 'hold' | 'tap', duration: durSec };
+        });
+
+        console.log(`🎮 [ACTIONS IA STAR CITIZEN] ${actionsToExecute.length} action(s) détectée(s) :`, actionsToExecute.map(a => `[${a.key.toUpperCase()}] (${a.pressType})`).join(', '));
+        macroManager.sendSequenceToBridge(actionsToExecute).catch(err => {
+          console.warn('Erreur envoi séquence touches IA:', err);
+        });
       }
 
       const botMessage: ChatMessage = {

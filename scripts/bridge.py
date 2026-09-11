@@ -35,7 +35,7 @@ except Exception:
     pass
 
 PORT = 5005
-CURRENT_VERSION = "1.1.1"
+CURRENT_VERSION = "1.2.0"
 
 def find_root_dir() -> str:
     """Détermine le dossier racine de l'application Nova (dossier contenant Nova-StarCitizen.exe, DEMARRER_NOVA.bat ou package.json)."""
@@ -942,6 +942,37 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                     return
             except Exception as e:
                 print(f"[ERREUR] {e}")
+
+        if clean in ('/sequence', '/nova/sequence'):
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body.decode("utf-8"))
+                actions = data.get("actions") or data.get("sequence") or []
+                layout = data.get("layout") or get_active_keyboard_layout()
+                results = []
+                for i, action in enumerate(actions):
+                    if i > 0:
+                        delay = float(action.get("delayBefore", 0.2))
+                        time.sleep(max(0.05, min(delay, 2.0)))
+                    k = action.get("key", "")
+                    ptype = action.get("pressType") or action.get("type", "tap")
+                    default_dur = 1.5 if ptype in ("hold", "long") else 0.18
+                    dur = float(action.get("duration", default_dur))
+                    if "durationMs" in action and action["durationMs"] is not None:
+                        dur = float(action["durationMs"]) / 1000.0
+                    if k:
+                        press_key(k, duration=dur, layout=layout)
+                        results.append({"key": k, "duration": dur, "pressType": ptype})
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self._send_cors()
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "results": results}).encode("utf-8"))
+                return
+            except Exception as e:
+                print(f"[ERREUR SEQUENCE] {e}")
 
         if clean in ('/config', '/nova/config'):
             content_length = int(self.headers.get("Content-Length", 0))

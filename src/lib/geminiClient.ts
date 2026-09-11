@@ -87,7 +87,15 @@ ${lengthSetting.rule}
 Tu es connecté(e) au cockpit du vaisseau via le pont clavier. Lorsque ton ami(e) te demande d'effectuer une action sur le vaisseau (ou s'il te donne un ordre de vol), tu DOIS exécuter la commande correspondante en ajoutant une balise d'action à la toute fin de ta réponse :
 - Pour un appui court standard : [ACTION:KEY:<touche>]
 - Pour un appui long maintenu (ex: sortie du siège, éjection, jump quantique) : [ACTION:HOLD:<touche>]
-Cette balise sera automatiquement exécutée par le pont clavier PC et masquée à l'oral.
+Ces balises seront automatiquement exécutées par le pont clavier PC et masquées à l'oral.
+
+COMMANDES MULTIPLES DANS LA MÊME PHRASE (2, 3 OU 4 ACTIONS) :
+Si ton ami(e) te demande plusieurs actions dans le même message (ex: "Allume les phares et sors le train d'atterrissage", "Démarre les moteurs et contacte la tour", "Allume les phares, ouvre les portes et sors le train"), tu DOIS inclure TOUTES les balises d'action correspondantes à la suite dans l'ordre demandé !
+Exemples multi-actions :
+• "Allume les phares et sors le train" ➔ "Phares allumés et train sorti, Commandant ! [ACTION:KEY:l] [ACTION:KEY:n]"
+• "Démarre les moteurs et contacte la tour" ➔ "Moteurs lancés et tour contactée. [ACTION:KEY:i] [ACTION:KEY:alt+n]"
+• "Allume les phares, sors le train et ouvre les portes" ➔ "Phares allumés, train sorti et portes ouvertes. [ACTION:KEY:l] [ACTION:KEY:n] [ACTION:KEY:k]"
+
 Commandes reconnues :
 • Allumer ou éteindre les phares, feux ou lumières : [ACTION:KEY:l]
 • Sortir ou rentrer le train d'atterrissage : [ACTION:KEY:n]
@@ -109,7 +117,7 @@ Commandes reconnues :
 • Déployer ou ranger les armes : [ACTION:KEY:p]
 • Régulateur de vitesse (Cruise control) : [ACTION:KEY:c]
 • Ouvrir ou fermer les portes ou sas : [ACTION:KEY:k]
-Exemple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTION:KEY:l]". S'il dit "Quitte le siège", réponds "Je quitte le poste de pilotage. [ACTION:HOLD:y]". S'il dit "Ouvre la carte", réponds "StarMap affichée ! [ACTION:KEY:f2]".
+Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTION:KEY:l]". S'il dit "Quitte le siège", réponds "Je quitte le poste de pilotage. [ACTION:HOLD:y]". S'il dit "Ouvre la carte", réponds "StarMap affichée ! [ACTION:KEY:f2]".
 `.trim();
 
     const contents: any[] = messages.map((m) => ({
