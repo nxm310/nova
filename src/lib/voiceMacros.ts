@@ -867,3 +867,28 @@ export const macroManager = {
     };
   },
 };
+
+export type MacroCategory = 'all' | 'flight' | 'systems' | 'hud';
+
+export function getMacroCategory(m: VoiceMacro): 'flight' | 'systems' | 'hud' {
+  const k = m.key.toLowerCase();
+  const id = m.id.toLowerCase();
+  if (k.startsWith('f') || id.includes('mobiglas') || id.includes('starmap') || id.includes('camera') || id.includes('comms')) {
+    return 'hud';
+  }
+  if (
+    id.includes('power') ||
+    id.includes('engine') ||
+    id.includes('flight') ||
+    id.includes('gear') ||
+    id.includes('landing') ||
+    id.includes('vtol') ||
+    id.includes('decouple') ||
+    id.includes('cruise') ||
+    id.includes('seat')
+  ) {
+    return 'flight';
+  }
+  return 'systems';
+}
+

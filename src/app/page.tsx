@@ -15,7 +15,7 @@ import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { ConversationModal, LiveCallState } from '@/components/ConversationModal';
 import { visionManager } from '@/lib/vision';
-import { macroManager, VoiceMacro } from '@/lib/voiceMacros';
+import { macroManager, VoiceMacro, getMacroCategory } from '@/lib/voiceMacros';
 import { geminiClient } from '@/lib/geminiClient';
 import {
   Settings,
@@ -895,36 +895,28 @@ export default function CompanionApp() {
           ? (macro.holdDuration || 1.5)
           : ((macro.tapDurationMs || 180) / 1000);
       await macroManager.sendKeyToBridge(macro.key, macro.pressType, durSec);
-      if (profile.autoPlayVoice) {
-        playSpeech(`Action ${macro.name}`);
+      
+      const confText = macro.confirmation || `Action ${macro.name} exécutée.`;
+
+      if (isCallActiveRef.current) {
+        setLastReply(confText);
+        if (!isCallMutedRef.current) {
+          setCallState('speaking');
+          playSpeech(confText, undefined, () => {
+            if (isCallActiveRef.current) {
+              setCallState('listening');
+              continuousRecognizerRef.current?.start();
+            }
+          });
+        }
+      } else if (profile.autoPlayVoice) {
+        playSpeech(confText);
       }
     } catch (err) {
       console.error('Erreur exécution macro cockpit:', err);
     } finally {
       setTimeout(() => setDeckFeedbackKey(null), 600);
     }
-  };
-
-  const getMacroCategory = (m: VoiceMacro): 'flight' | 'systems' | 'hud' => {
-    const k = m.key.toLowerCase();
-    const id = m.id.toLowerCase();
-    if (k.startsWith('f') || id.includes('mobiglas') || id.includes('starmap') || id.includes('camera') || id.includes('comms')) {
-      return 'hud';
-    }
-    if (
-      id.includes('power') ||
-      id.includes('engine') ||
-      id.includes('flight') ||
-      id.includes('gear') ||
-      id.includes('landing') ||
-      id.includes('vtol') ||
-      id.includes('decouple') ||
-      id.includes('cruise') ||
-      id.includes('seat')
-    ) {
-      return 'flight';
-    }
-    return 'systems';
   };
 
   const displayedMacros = activeMacros.filter((m) => {
@@ -1634,6 +1626,9 @@ export default function CompanionApp() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         isMuted={isCallMuted}
         onToggleMute={handleToggleCallMute}
+        macros={activeMacros}
+        onTriggerMacro={handleDeckTrigger}
+        deckFeedbackKey={deckFeedbackKey}
       />
 
       {/* Modal de Mise à Jour 1-Clic */}
