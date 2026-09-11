@@ -16,6 +16,9 @@ export interface PersonalityPreset {
   promptInstruction: string;
 }
 
+export type ResponseLength = 'ultra_concise' | 'short' | 'balanced' | 'detailed';
+export type ResponseQuality = 'fast' | 'high';
+
 export interface CompanionProfile {
   name: string;
   avatar: string; // Emoji ou identifiant d'avatar
@@ -31,6 +34,8 @@ export interface CompanionProfile {
   robotEffect?: boolean; // Effet métallique / vocoder robotique
   pitch?: string; // ex: '+0Hz', '+15Hz', '+25Hz'
   webSearch?: boolean; // Recherche Google en temps réel (Grounding)
+  responseLength?: ResponseLength; // Longueur des réponses ('ultra_concise' | 'short' | 'balanced' | 'detailed')
+  responseQuality?: ResponseQuality; // Qualité / Modèle IA ('fast' = Flash rapide | 'high' = Pro haute précision)
 }
 
 export interface MemoryItem {

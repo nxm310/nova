@@ -97,4 +97,6 @@ export const DEFAULT_PROFILE: CompanionProfile = {
   robotEffect: false,
   pitch: '+0Hz',
   webSearch: true,
+  responseLength: 'short', // Réponses courtes (1 à 2 phrases max) par défaut
+  responseQuality: 'fast', // Gemini 2.5 Flash ultra-rapide par défaut
 };

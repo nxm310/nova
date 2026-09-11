@@ -686,6 +686,158 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
+              {/* Longueur des réponses */}
+              <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-cyan-400" />
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                      Longueur des réponses
+                    </label>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-cyan-950 text-cyan-300 border border-cyan-500/30">
+                    {formData.responseLength === 'ultra_concise'
+                      ? 'Ultra-Court'
+                      : formData.responseLength === 'balanced'
+                      ? 'Équilibré'
+                      : formData.responseLength === 'detailed'
+                      ? 'Détaillé'
+                      : 'Court (Conseillé)'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Ajustez la concision des réponses de Nova pour un rendu ultra-dynamique en vol ou plus bavard.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {[
+                    {
+                      id: 'ultra_concise' as const,
+                      title: '⚡ Ultra-Court',
+                      desc: '1 phrase max (10-15 mots)',
+                      badge: 'Combat / Vol intense',
+                    },
+                    {
+                      id: 'short' as const,
+                      title: '💬 Court',
+                      desc: '1 à 2 phrases brèves',
+                      badge: 'Recommandé',
+                    },
+                    {
+                      id: 'balanced' as const,
+                      title: '⚖️ Équilibré',
+                      desc: '2 à 3 phrases claires',
+                      badge: 'Naturel',
+                    },
+                    {
+                      id: 'detailed' as const,
+                      title: '📖 Détaillé',
+                      desc: 'Explications complètes',
+                      badge: 'Exhaustif',
+                    },
+                  ].map((opt) => {
+                    const isSelected = (formData.responseLength || 'short') === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, responseLength: opt.id })}
+                        className={`p-2.5 rounded-xl border text-left transition relative flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-cyan-500/15 border-cyan-500 text-white shadow-sm shadow-cyan-500/20 ring-1 ring-cyan-500/50'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/60 hover:border-slate-700'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-semibold text-xs text-white mb-0.5">
+                            {opt.title}
+                          </div>
+                          <div className="text-[11px] text-slate-400 leading-tight">
+                            {opt.desc}
+                          </div>
+                        </div>
+                        <span
+                          className={`mt-2 text-[9px] font-medium px-1.5 py-0.5 rounded-md self-start ${
+                            isSelected
+                              ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-500/40 font-bold'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {opt.badge}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Qualité & Modèle de l'IA */}
+              <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-purple-400" />
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                      Qualité & Modèle de l&apos;Assistant
+                    </label>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-purple-950 text-purple-300 border border-purple-500/30">
+                    {formData.responseQuality === 'high' ? 'Gemini 2.5 Pro' : 'Gemini 2.5 Flash'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Choisissez entre vitesse d&apos;exécution instantanée pour vos manœuvres ou profondeur d&apos;analyse.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {[
+                    {
+                      id: 'fast' as const,
+                      title: '🚀 Gemini 2.5 Flash (Ultra-rapide)',
+                      desc: 'Latence minimale (<1s). Recommandé pour Star Citizen, les ordres vocaux en direct et les réflexes en vol.',
+                      badge: 'Recommandé en vol',
+                    },
+                    {
+                      id: 'high' as const,
+                      title: '🧠 Gemini 2.5 Pro (Haute précision)',
+                      desc: 'Raisonnement approfondi, analyse poussée des questions complexes et formulations très riches.',
+                      badge: 'Haute réflexion',
+                    },
+                  ].map((opt) => {
+                    const isSelected = (formData.responseQuality || 'fast') === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, responseQuality: opt.id })}
+                        className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-purple-600/15 border-purple-500 text-white shadow-sm shadow-purple-500/20 ring-1 ring-purple-500/50'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/60 hover:border-slate-700'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-semibold text-xs text-white mb-1">
+                            {opt.title}
+                          </div>
+                          <div className="text-[11px] text-slate-400 leading-relaxed">
+                            {opt.desc}
+                          </div>
+                        </div>
+                        <span
+                          className={`mt-2.5 text-[10px] font-medium px-2 py-0.5 rounded-md self-start ${
+                            isSelected
+                              ? 'bg-purple-500/25 text-purple-200 border border-purple-500/40 font-bold'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {opt.badge}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Instructions en arrière-plan */}
               <div>
                 <div className="flex items-center justify-between mb-1">

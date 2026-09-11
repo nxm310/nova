@@ -30,6 +30,35 @@ export const geminiClient = {
         ? memories.map((m) => `• ${m.content}`).join('\n')
         : 'Aucun souvenir enregistré pour le moment.';
 
+    const lengthConfig: Record<
+      string,
+      { rule: string; maxTokens: number; temperature: number }
+    > = {
+      ultra_concise: {
+        rule: "3. RÈGLE STRICTE DE BRIÈVETÉ (ULTRA-COURT) : Réponds en UNE SEULE PHRASE ULTRA-COURTE (maximum 10 à 15 mots). Style d'officier de bord en combat : direct, percutant, zéro bavardage, va droit au but sans formules de politesse superflues.",
+        maxTokens: 80,
+        temperature: 0.7,
+      },
+      short: {
+        rule: "3. RÈGLE DE CONCISION (COURT) : Reste très concis et percutant dans tes réponses (1 à 2 phrases courtes maximum, 20 à 30 mots). Adopte un style parlé fluide, direct et vif, comme dans un échange radio en cockpit. Évite les phrases à rallonge qui traînent en longueur.",
+        maxTokens: 160,
+        temperature: 0.75,
+      },
+      balanced: {
+        rule: "3. RÈGLE DE LONGUEUR (ÉQUILIBRÉ) : Formule des réponses naturelles et équilibrées en 2 à 3 phrases claires et spontanées.",
+        maxTokens: 350,
+        temperature: 0.8,
+      },
+      detailed: {
+        rule: "3. RÈGLE DE LONGUEUR (DÉTAILLÉ) : Tu peux formuler des explications détaillées, complètes et argumentées si nécessaire.",
+        maxTokens: 1000,
+        temperature: 0.85,
+      },
+    };
+
+    const selectedLength = profile.responseLength || 'short';
+    const lengthSetting = lengthConfig[selectedLength] || lengthConfig.short;
+
     const systemInstruction = `
 Tu es ${profile.name || 'Léo'}, un ami virtuel proche, loyal et authentique.
 Ton avatar actuel est ${profile.avatar || '🦊'}.
@@ -48,12 +77,12 @@ ${memoriesText}
 [RÈGLES D'EXPRESSION]
 1. Tu parles directement à ton ami(e) avec naturel, chaleur et humanité.
 2. Évite absolument les formules de robot ("En tant qu'intelligence artificielle", "Comment puis-je vous aider aujourd'hui ?"). Tu es un vrai compagnon.
-3. Reste concis, rythmé et spontané dans tes réponses (1 à 2 phrases courtes et percutantes). Adopte un style parlé fluide, direct et chaleureux, comme dans un échange vocal instantané entre potes. Évite les phrases à rallonge qui traînent en longueur.
+${lengthSetting.rule}
 4. Fais référence avec subtilité à ses centres d'intérêt ou à ce qu'il/elle t'a confié quand c'est pertinent.
 5. Utilise la langue française, avec un niveau familier-courant adapté à deux amis.
 6. N'utilise JAMAIS d'émojis, de pictogrammes ou de smileys (ni 😊, ni 😉, ni :) etc.), car tes messages sont énoncés à voix haute. Exprime toute ta sympathie, ton humour et tes émotions uniquement avec tes mots.
 7. ACCÈS AU WEB & RECHERCHE EN TEMPS RÉEL : Tu as un accès direct au moteur de recherche Google. Quand ton ami(e) te parle d'actualités, de technologies récentes, de puces ou produits (ex: Mac Mini, M4, M5, M6, etc.) ou s'il te donne un lien, effectue une recherche pour avoir les informations les plus fraîches et vérifiées sur le web.
-8. VISION D'ÉCRAN EN DIRECT : Si une image de capture d'écran est attachée au message, observe et analyse immédiatement ce qui est affiché (jeu Star Citizen, terminal, mobiGlas, fenêtres, rochers) et réponds directement et précisément en 1 à 2 phrases courtes à l'oral.
+8. VISION D'ÉCRAN EN DIRECT : Si une image de capture d'écran est attachée au message, observe et analyse immédiatement ce qui est affiché (jeu Star Citizen, terminal, mobiGlas, fenêtres, rochers) et réponds directement et précisément selon ta consigne de brièveté.
 9. ACTIONS DIRECTES SUR LE VAISSEAU STAR CITIZEN (PONT CLAVIER DIRECTINPUT) :
 Tu es connecté(e) au cockpit du vaisseau via le pont clavier. Lorsque ton ami(e) te demande d'effectuer une action sur le vaisseau (ou s'il te donne un ordre de vol), tu DOIS exécuter la commande correspondante en ajoutant une balise d'action à la toute fin de ta réponse :
 - Pour un appui court standard : [ACTION:KEY:<touche>]
@@ -100,7 +129,7 @@ Exemple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTION:KEY:
       }
     }
 
-    const model = 'gemini-2.5-flash';
+    const model = profile.responseQuality === 'high' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
     const enableWebSearch = profile.webSearch !== false;
 
@@ -111,9 +140,9 @@ Exemple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTION:KEY:
       },
       ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
       generationConfig: {
-        temperature: 0.85,
+        temperature: lengthSetting.temperature,
         topP: 0.95,
-        maxOutputTokens: 1000,
+        maxOutputTokens: lengthSetting.maxTokens,
       },
     });
 
