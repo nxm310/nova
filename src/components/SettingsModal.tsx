@@ -40,6 +40,7 @@ import {
   Clock,
   RefreshCw,
   Keyboard,
+  ChevronDown,
 } from 'lucide-react';
 import { macroManager, VoiceMacro, DEFAULT_VOICE_MACROS } from '@/lib/voiceMacros';
 import { geminiClient } from '@/lib/geminiClient';
@@ -88,6 +89,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [bridgeTesting, setBridgeTesting] = useState<boolean>(false);
   const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
   const [keyboardLayout, setKeyboardLayout] = useState<'azerty' | 'qwerty'>('azerty');
+  const [isBridgeConfigOpen, setIsBridgeConfigOpen] = useState<boolean>(false);
+  const [isKeyboardConfigOpen, setIsKeyboardConfigOpen] = useState<boolean>(false);
 
   // Formulaire nouvelle macro
   const [isAddMacroOpen, setIsAddMacroOpen] = useState<boolean>(false);
@@ -123,6 +126,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setBridgeStatus(null);
       setEditingMacroId(null);
       setIsAddMacroOpen(false);
+      setIsBridgeConfigOpen(false);
+      setIsKeyboardConfigOpen(false);
       setSyncStatus(null);
     }
   }, [isOpen, profile]);
@@ -1292,181 +1297,518 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* TAB 5: TOUCHES & MACROS VOCALES (STAR CITIZEN) */}
           {activeTab === 'macros' && (
-            <div className="space-y-6 animate-fade-in text-slate-200">
-              {/* Carte Pont Clavier PC */}
-              <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Radio className="w-4 h-4 text-cyan-400" />
-                    <h3 className="font-semibold text-sm text-white">
-                      Pont Clavier PC (DirectInput)
-                    </h3>
-                  </div>
-                  {bridgeStatus?.startsWith('connecté') && (
-                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> {bridgeStatus}
-                    </span>
-                  )}
-                  {bridgeStatus === 'inaccessible' && (
-                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
-                      Déconnecté
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Permet à Ami de presser directement des touches physiques dans Star Citizen avec 0ms de latence dès que vous prononcez l&apos;ordre à la voix.
-                </p>
-
-                {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
-                  <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-xs text-amber-200 space-y-1.5">
-                    <div className="font-semibold flex items-center gap-1.5 text-amber-300">
-                      <span>⚠️ Navigation HTTPS distante détectée</span>
-                    </div>
-                    <p className="leading-relaxed text-[11px] text-amber-200/90">
-                      Les navigateurs interdisent à un site web distant sécurisé (HTTPS) de communiquer directement avec votre PC en HTTP local (sécurité Mixed Content).
-                    </p>
-                    <p className="leading-relaxed text-[11px] font-medium text-white">
-                      👉 Pour que les touches fonctionnent dans votre jeu, lancez <span className="font-semibold text-cyan-300">DEMARRER_NOVA.bat</span> sur votre PC et ouvrez l&apos;application sur :{' '}
-                      <span className="font-mono text-cyan-300">http://localhost:5005/nova/</span>
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={bridgeUrl}
-                    onChange={(e) => setBridgeUrl(e.target.value)}
-                    placeholder="http://localhost:5005 ou http://127.0.0.1:5005"
-                    className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
-                  />
+            <div className="space-y-4 animate-fade-in text-slate-200">
+              {/* Barre d'options compacte en haut : Pont Clavier, Disposition Clavier, Ajouter commande */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Bouton Option 1 : Pont Clavier PC */}
                   <button
                     type="button"
-                    onClick={handleTestBridge}
-                    disabled={bridgeTesting}
-                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-cyan-300 transition shrink-0 flex items-center gap-1.5"
+                    onClick={() => setIsBridgeConfigOpen(!isBridgeConfigOpen)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition border ${
+                      isBridgeConfigOpen
+                        ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300 shadow-sm'
+                        : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white'
+                    }`}
+                    title="Ouvrir la configuration et le test du pont clavier DirectInput PC"
                   >
-                    {bridgeTesting ? 'Test...' : 'Tester connexion'}
+                    <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Pont Clavier</span>
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        bridgeStatus?.startsWith('connecté')
+                          ? 'bg-emerald-400 shadow-sm shadow-emerald-400/60'
+                          : bridgeStatus === 'inaccessible'
+                          ? 'bg-red-400'
+                          : 'bg-slate-500'
+                      }`}
+                    />
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                        isBridgeConfigOpen ? 'rotate-180 text-cyan-300' : ''
+                      }`}
+                    />
                   </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const res = await macroManager.sendKeyToBridge('u');
-                      if (res.success) {
-                        alert("✓ Touche 'U' (Démarrage vaisseau) envoyée avec succès au pont PC !");
-                      } else {
-                        alert("❌ Échec : le pont clavier n'a pas répondu. Vérifiez que DEMARRER_NOVA.bat tourne sur le PC.");
-                      }
-                    }}
-                    className="px-3 py-2 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 rounded-xl text-xs font-semibold text-cyan-300 transition shrink-0"
-                    title="Envoie un appui sur la touche U pour tester le démarrage du vaisseau"
-                  >
-                    Tester touche [U]
-                  </button>
-                </div>
 
-                <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
-                  <div className="font-semibold text-slate-300 flex items-center gap-1">
-                    <span>💡 Comment lancer le pont sur votre PC en 1 clic :</span>
-                  </div>
-                  <p className="text-[11px] text-slate-300">
-                    Double-cliquez sur <code className="text-cyan-300 font-bold">DEMARRER_NOVA.bat</code> (ou <code className="text-cyan-300 font-bold">Nova-StarCitizen.exe</code>) sur votre PC de jeu.
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    La fenêtre s&apos;ouvre automatiquement en Administrateur et votre navigateur web s&apos;ouvre sur le compagnon prêt pour Star Citizen !
-                  </p>
-                </div>
-              </div>
-
-              {/* Carte Disposition du Clavier Star Citizen (AZERTY / QWERTY) */}
-              <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Keyboard className="w-4 h-4 text-cyan-400" />
-                      <h3 className="font-semibold text-sm text-white">
-                        Disposition du Clavier Star Citizen
-                      </h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold bg-cyan-950 text-cyan-300 border border-cyan-500/30">
-                        {keyboardLayout === 'azerty' ? 'AZERTY (Français)' : 'QWERTY (US)'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      {keyboardLayout === 'azerty'
-                        ? "✓ Clavier AZERTY actif : les touches A, Z, Q, W, M et la rangée des chiffres envoient les scan codes DirectInput réels de votre clavier français pour Star Citizen."
-                        : "Clavier QWERTY actif : les touches envoient les scan codes standards américains."}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-center">
+                  {/* Bouton Option 2 : Disposition Clavier Star Citizen */}
+                  <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5">
                     <button
                       type="button"
-                      onClick={() => handleSetKeyboardLayout('azerty')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        keyboardLayout === 'azerty'
-                          ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                          : 'text-slate-400 hover:text-white'
+                      onClick={() => setIsKeyboardConfigOpen(!isKeyboardConfigOpen)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                        isKeyboardConfigOpen
+                          ? 'bg-cyan-950/80 text-cyan-300'
+                          : 'text-slate-300 hover:text-white'
                       }`}
+                      title="Afficher les détails de la disposition de clavier"
                     >
-                      AZERTY (Français)
+                      <Keyboard className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="font-mono">{keyboardLayout === 'azerty' ? 'AZERTY' : 'QWERTY'}</span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                          isKeyboardConfigOpen ? 'rotate-180 text-cyan-300' : ''
+                        }`}
+                      />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleSetKeyboardLayout('qwerty')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        keyboardLayout === 'qwerty'
-                          ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
+                      onClick={() => handleSetKeyboardLayout(keyboardLayout === 'azerty' ? 'qwerty' : 'azerty')}
+                      className="ml-1 px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition active:scale-95"
+                      title={`Basculer immédiatement en ${keyboardLayout === 'azerty' ? 'QWERTY' : 'AZERTY'}`}
                     >
-                      QWERTY (US)
+                      ⇄ {keyboardLayout === 'azerty' ? 'QWERTY' : 'AZERTY'}
                     </button>
                   </div>
                 </div>
 
-                {/* Badge explicatif des correspondances physiques AZERTY */}
-                {keyboardLayout === 'azerty' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-800/60 text-[11px] font-mono">
-                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                      <span className="text-cyan-300 font-bold">[Z]</span> <span className="text-slate-400">Avancer (0x11)</span>
-                    </div>
-                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                      <span className="text-cyan-300 font-bold">[A]</span> <span className="text-slate-400">Strafe G / Roulis (0x10)</span>
-                    </div>
-                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                      <span className="text-cyan-300 font-bold">[Q]</span> <span className="text-slate-400">Touche Q (0x1E)</span>
-                    </div>
-                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                      <span className="text-cyan-300 font-bold">[W]</span> <span className="text-slate-400">Touche W (0x2C)</span>
-                    </div>
-                    <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                      <span className="text-cyan-300 font-bold">[M]</span> <span className="text-slate-400">Minage / Missile (0x27)</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bouton dédié pour ouvrir le formulaire d'assignation */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 flex-wrap gap-2">
-                  <span className="text-xs text-slate-400">
-                    Besoin d&apos;assigner une nouvelle touche pour un ordre vocal ?
-                  </span>
+                {/* Bouton Option 3 : Ajouter une commande */}
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsAddMacroOpen(!isAddMacroOpen)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-md ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm ${
                       isAddMacroOpen
                         ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
                         : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-600/30'
                     }`}
                   >
                     <Plus className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMacroOpen ? 'rotate-45' : ''}`} />
-                    <span>{isAddMacroOpen ? 'Masquer le formulaire' : 'Ajouter une commande'}</span>
+                    <span>{isAddMacroOpen ? 'Fermer ajout' : '+ Ajouter commande'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Liste des Commandes Vocales Configurées */}
+              {/* PANNEAU ESCAMOTABLE : Pont Clavier PC (masqué par défaut) */}
+              {isBridgeConfigOpen && (
+                <div className="p-4 bg-slate-950/90 border border-cyan-500/30 rounded-2xl space-y-3 animate-fade-in shadow-xl shadow-cyan-950/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Radio className="w-4 h-4 text-cyan-400" />
+                      <h3 className="font-semibold text-sm text-white">
+                        Pont Clavier PC (DirectInput)
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {bridgeStatus?.startsWith('connecté') && (
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> {bridgeStatus}
+                        </span>
+                      )}
+                      {bridgeStatus === 'inaccessible' && (
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
+                          Déconnecté
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsBridgeConfigOpen(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                        title="Fermer ce panneau"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Permet à Ami de presser directement des touches physiques dans Star Citizen avec 0ms de latence dès que vous prononcez l&apos;ordre à la voix.
+                  </p>
+
+                  {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
+                    <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-xs text-amber-200 space-y-1.5">
+                      <div className="font-semibold flex items-center gap-1.5 text-amber-300">
+                        <span>⚠️ Navigation HTTPS distante détectée</span>
+                      </div>
+                      <p className="leading-relaxed text-[11px] text-amber-200/90">
+                        Les navigateurs interdisent à un site web distant sécurisé (HTTPS) de communiquer directement avec votre PC en HTTP local (sécurité Mixed Content).
+                      </p>
+                      <p className="leading-relaxed text-[11px] font-medium text-white">
+                        👉 Pour que les touches fonctionnent dans votre jeu, lancez <span className="font-semibold text-cyan-300">DEMARRER_NOVA.bat</span> sur votre PC et ouvrez l&apos;application sur :{' '}
+                        <span className="font-mono text-cyan-300">http://localhost:5005/nova/</span>
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={bridgeUrl}
+                      onChange={(e) => setBridgeUrl(e.target.value)}
+                      placeholder="http://localhost:5005 ou http://127.0.0.1:5005"
+                      className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleTestBridge}
+                      disabled={bridgeTesting}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-cyan-300 transition shrink-0 flex items-center gap-1.5"
+                    >
+                      {bridgeTesting ? 'Test...' : 'Tester connexion'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await macroManager.sendKeyToBridge('u');
+                        if (res.success) {
+                          alert("✓ Touche 'U' (Démarrage vaisseau) envoyée avec succès au pont PC !");
+                        } else {
+                          alert("❌ Échec : le pont clavier n'a pas répondu. Vérifiez que DEMARRER_NOVA.bat tourne sur le PC.");
+                        }
+                      }}
+                      className="px-3 py-2 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 rounded-xl text-xs font-semibold text-cyan-300 transition shrink-0"
+                      title="Envoie un appui sur la touche U pour tester le démarrage du vaisseau"
+                    >
+                      Tester touche [U]
+                    </button>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
+                    <div className="font-semibold text-slate-300 flex items-center gap-1">
+                      <span>💡 Comment lancer le pont sur votre PC en 1 clic :</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Double-cliquez sur <code className="text-cyan-300 font-bold">DEMARRER_NOVA.bat</code> (ou <code className="text-cyan-300 font-bold">Nova-StarCitizen.exe</code>) sur votre PC de jeu.
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      La fenêtre s&apos;ouvre automatiquement en Administrateur et votre navigateur web s&apos;ouvre sur le compagnon prêt pour Star Citizen !
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* PANNEAU ESCAMOTABLE : Disposition du Clavier Star Citizen (masqué par défaut) */}
+              {isKeyboardConfigOpen && (
+                <div className="p-4 bg-slate-950/90 border border-cyan-500/30 rounded-2xl space-y-3 animate-fade-in shadow-xl shadow-cyan-950/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Keyboard className="w-4 h-4 text-cyan-400" />
+                        <h3 className="font-semibold text-sm text-white">
+                          Disposition du Clavier Star Citizen
+                        </h3>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold bg-cyan-950 text-cyan-300 border border-cyan-500/30">
+                          {keyboardLayout === 'azerty' ? 'AZERTY (Français)' : 'QWERTY (US)'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        {keyboardLayout === 'azerty'
+                          ? "✓ Clavier AZERTY actif : les touches A, Z, Q, W, M et la rangée des chiffres envoient les scan codes DirectInput réels de votre clavier français pour Star Citizen."
+                          : "Clavier QWERTY actif : les touches envoient les scan codes standards américains."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => handleSetKeyboardLayout('azerty')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            keyboardLayout === 'azerty'
+                              ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          AZERTY (Français)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetKeyboardLayout('qwerty')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            keyboardLayout === 'qwerty'
+                              ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          QWERTY (US)
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsKeyboardConfigOpen(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                        title="Fermer ce panneau"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Badge explicatif des correspondances physiques AZERTY */}
+                  {keyboardLayout === 'azerty' && (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-800/60 text-[11px] font-mono">
+                      <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                        <span className="text-cyan-300 font-bold">[Z]</span> <span className="text-slate-400">Avancer (0x11)</span>
+                      </div>
+                      <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                        <span className="text-cyan-300 font-bold">[A]</span> <span className="text-slate-400">Strafe G / Roulis (0x10)</span>
+                      </div>
+                      <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                        <span className="text-cyan-300 font-bold">[Q]</span> <span className="text-slate-400">Touche Q (0x1E)</span>
+                      </div>
+                      <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                        <span className="text-cyan-300 font-bold">[W]</span> <span className="text-slate-400">Touche W (0x2C)</span>
+                      </div>
+                      <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                        <span className="text-cyan-300 font-bold">[M]</span> <span className="text-slate-400">Minage / Missile (0x27)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* FORMULAIRE ESCAMOTABLE D'AJOUT D'UNE COMMANDE (masqué par défaut) */}
+              {isAddMacroOpen && (
+                <form
+                  onSubmit={handleAddCustomMacro}
+                  className="p-4 bg-slate-900/95 border border-cyan-500/40 rounded-2xl space-y-3 animate-fade-in shadow-xl shadow-cyan-950/40"
+                >
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <div className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Assigner une nouvelle touche à un ordre verbal</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddMacroOpen(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                      title="Fermer le formulaire"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Nom de la fonction
+                      </label>
+                      <input
+                        type="text"
+                        value={newMacroName}
+                        onChange={(e) => setNewMacroName(e.target.value)}
+                        placeholder="Ex: Train d'atterrissage, Phares..."
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accent-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Touche clavier à presser
+                      </label>
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={newMacroKey}
+                          onChange={(e) => setNewMacroKey(e.target.value)}
+                          onKeyDown={(e) => handleKeyInputKeyDown(e, 'new')}
+                          placeholder="Ex: alt+n, lalt+j, u, space, f1..."
+                          maxLength={20}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 font-mono uppercase focus:outline-none focus:border-accent-500"
+                        />
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="text-[9px] text-slate-500">Ajouter :</span>
+                          <button
+                            type="button"
+                            onClick={() => appendModifier('new', 'alt')}
+                            className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                          >
+                            + ALT
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => appendModifier('new', 'ctrl')}
+                            className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                          >
+                            + CTRL
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => appendModifier('new', 'shift')}
+                            className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
+                          >
+                            + SHIFT
+                          </button>
+                        </div>
+
+                        {/* Barre d'insertion rapide Touches F1 à F12 */}
+                        <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-slate-800/60">
+                          <span className="text-[9px] text-slate-500 mr-0.5">Touches F :</span>
+                          {['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'].map((f) => (
+                            <button
+                              key={f}
+                              type="button"
+                              onClick={() => setFunctionKey('new', f)}
+                              className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-slate-800 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-slate-700 active:scale-95 transition uppercase"
+                              title={`Sélectionner la touche ${f.toUpperCase()}`}
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sélecteur Appui Court vs Appui Long */}
+                    <div className="col-span-1 sm:col-span-2 pt-1 border-t border-slate-800/60">
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Type d&apos;appui sur la touche
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewMacroPressType('tap')}
+                          className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                            newMacroPressType === 'tap'
+                              ? 'bg-accent-600/30 border-accent-500 text-accent-200 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Zap className="w-3.5 h-3.5 text-accent-400" />
+                          <span>Appui Court ({newMacroTapDurationMs}ms)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewMacroPressType('hold')}
+                          className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                            newMacroPressType === 'hold'
+                              ? 'bg-purple-600/30 border-purple-500 text-purple-200 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Clock className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Appui Long ({newMacroDuration}s)</span>
+                        </button>
+                      </div>
+
+                      {newMacroPressType === 'tap' && (
+                        <div className="flex items-center gap-1.5 flex-wrap mt-2 p-2 rounded-xl bg-accent-950/30 border border-accent-500/30 text-xs">
+                          <span className="text-[11px] text-accent-300 shrink-0 font-semibold flex items-center gap-1">
+                            <Zap className="w-3.5 h-3.5 text-accent-400" />
+                            Durée de l&apos;appui :
+                          </span>
+                          {[50, 100, 180, 250, 300, 500].map((ms) => (
+                            <button
+                              key={ms}
+                              type="button"
+                              onClick={() => setNewMacroTapDurationMs(ms)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition ${
+                                newMacroTapDurationMs === ms
+                                  ? 'bg-accent-500 text-slate-950 font-bold shadow-sm'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                              }`}
+                            >
+                              {ms}ms{ms === 180 ? ' (défaut)' : ''}
+                            </button>
+                          ))}
+                          <div className="flex items-center gap-1 ml-auto shrink-0 pl-1.5 border-l border-accent-500/30">
+                            <input
+                              type="number"
+                              min="20"
+                              max="2000"
+                              step="10"
+                              value={newMacroTapDurationMs}
+                              onChange={(e) =>
+                                setNewMacroTapDurationMs(
+                                  Math.max(20, parseInt(e.target.value, 10) || 20)
+                                )
+                              }
+                              className="w-14 px-1.5 py-0.5 text-center font-mono text-xs bg-slate-900 border border-accent-500/40 rounded-lg text-accent-200 font-bold focus:outline-none focus:border-accent-400"
+                              title="Valeur personnalisée en millisecondes"
+                            />
+                            <span className="text-[11px] font-mono text-accent-400 font-bold">ms</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {newMacroPressType === 'hold' && (
+                        <div className="flex items-center gap-2 mt-2 p-2 rounded-xl bg-purple-950/30 border border-purple-500/30 text-xs">
+                          <span className="text-[11px] text-purple-300 shrink-0">Durée du maintien :</span>
+                          {[1.0, 1.5, 2.0, 3.0].map((dur) => (
+                            <button
+                              key={dur}
+                              type="button"
+                              onClick={() => setNewMacroDuration(dur)}
+                              className={`px-2 py-0.5 rounded-lg text-[11px] font-mono transition ${
+                                newMacroDuration === dur
+                                  ? 'bg-purple-600 text-white font-bold'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              {dur}s
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Phrases vocales déclencheuses (séparées par une virgule)
+                    </label>
+                    <input
+                      type="text"
+                      value={newMacroPhrases}
+                      onChange={(e) => setNewMacroPhrases(e.target.value)}
+                      placeholder="Ex: sort le train, rentre le train, atterrissage"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accent-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Réponse vocale de confirmation du compagnon
+                    </label>
+                    <input
+                      type="text"
+                      value={newMacroReply}
+                      onChange={(e) => setNewMacroReply(e.target.value)}
+                      placeholder="Ex: Train d'atterrissage actionné, Commandant."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accent-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!newMacroKey.trim()}
+                      onClick={() =>
+                        handleTestSingleKey(
+                          newMacroKey,
+                          'new_test',
+                          newMacroPressType,
+                          newMacroPressType === 'hold'
+                            ? newMacroDuration
+                            : newMacroTapDurationMs / 1000
+                        )
+                      }
+                      className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-cyan-300 font-semibold rounded-xl text-xs transition active:scale-95 border border-slate-700 flex items-center justify-center gap-1.5 shrink-0"
+                      title="Tester la frappe avec la durée sélectionnée"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>
+                        Tester [{newMacroKey.toUpperCase() || '?'}] {newMacroPressType === 'hold' ? `(${newMacroDuration}s)` : `(${newMacroTapDurationMs}ms)`}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddMacroOpen(false)}
+                      className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition shrink-0"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!newMacroName.trim() || !newMacroKey.trim() || !newMacroPhrases.trim()}
+                      className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:hover:bg-cyan-600 text-white font-semibold rounded-xl text-xs transition active:scale-95 shadow-md shadow-cyan-600/30"
+                    >
+                      Ajouter cette commande vocale
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Liste des Commandes Vocales Configurées (visible immédiatement) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
@@ -1480,18 +1822,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setIsAddMacroOpen(!isAddMacroOpen)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm ${
-                        isAddMacroOpen
-                          ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                          : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-600/30'
-                      }`}
-                    >
-                      <Plus className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddMacroOpen ? 'rotate-45' : ''}`} />
-                      <span>{isAddMacroOpen ? 'Fermer formulaire' : 'Ajouter une commande'}</span>
-                    </button>
-                    <button
-                      type="button"
                       onClick={handleResetDefaultMacros}
                       className="text-[11px] text-slate-400 hover:text-slate-200 underline transition"
                     >
@@ -1500,7 +1830,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
                   {macros.map((m) => (
                     <div
                       key={m.id}
@@ -1884,260 +2214,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   ))}
                 </div>
               </div>
-
-              {/* Formulaire escamotable d'ajout d'une nouvelle commande vocale */}
-              {isAddMacroOpen && (
-                <form
-                  onSubmit={handleAddCustomMacro}
-                  className="p-4 bg-slate-900/95 border border-cyan-500/40 rounded-2xl space-y-3 animate-fade-in shadow-xl shadow-cyan-950/40"
-                >
-                  <div className="flex items-center justify-between pb-1 border-b border-slate-800">
-                    <div className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
-                      <Plus className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Assigner une nouvelle touche à un ordre verbal</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddMacroOpen(false)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-                      title="Fermer le formulaire"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">
-                      Nom de la fonction
-                    </label>
-                    <input
-                      type="text"
-                      value={newMacroName}
-                      onChange={(e) => setNewMacroName(e.target.value)}
-                      placeholder="Ex: Train d'atterrissage, Phares..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accent-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">
-                      Touche clavier à presser
-                    </label>
-                    <div className="space-y-1.5">
-                      <input
-                        type="text"
-                        value={newMacroKey}
-                        onChange={(e) => setNewMacroKey(e.target.value)}
-                        onKeyDown={(e) => handleKeyInputKeyDown(e, 'new')}
-                        placeholder="Ex: alt+n, lalt+j, u, space, f1..."
-                        maxLength={20}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 font-mono uppercase focus:outline-none focus:border-accent-500"
-                      />
-                      <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-[9px] text-slate-500">Ajouter :</span>
-                        <button
-                          type="button"
-                          onClick={() => appendModifier('new', 'alt')}
-                          className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
-                        >
-                          + ALT
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => appendModifier('new', 'ctrl')}
-                          className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
-                        >
-                          + CTRL
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => appendModifier('new', 'shift')}
-                          className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-800 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-700"
-                        >
-                          + SHIFT
-                        </button>
-                      </div>
-
-                      {/* Barre d'insertion rapide Touches F1 à F12 */}
-                      <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-slate-800/60">
-                        <span className="text-[9px] text-slate-500 mr-0.5">Touches F :</span>
-                        {['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'].map((f) => (
-                          <button
-                            key={f}
-                            type="button"
-                            onClick={() => setFunctionKey('new', f)}
-                            className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-slate-800 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-slate-700 active:scale-95 transition uppercase"
-                            title={`Sélectionner la touche ${f.toUpperCase()}`}
-                          >
-                            {f}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sélecteur Appui Court vs Appui Long */}
-                  <div className="col-span-1 sm:col-span-2 pt-1 border-t border-slate-800/60">
-                    <label className="block text-[11px] text-slate-400 mb-1">
-                      Type d&apos;appui sur la touche
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setNewMacroPressType('tap')}
-                        className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                          newMacroPressType === 'tap'
-                            ? 'bg-accent-600/30 border-accent-500 text-accent-200 shadow-sm'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <Zap className="w-3.5 h-3.5 text-accent-400" />
-                        <span>Appui Court ({newMacroTapDurationMs}ms)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewMacroPressType('hold')}
-                        className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                          newMacroPressType === 'hold'
-                            ? 'bg-purple-600/30 border-purple-500 text-purple-200 shadow-sm'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <Clock className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Appui Long ({newMacroDuration}s)</span>
-                      </button>
-                    </div>
-
-                    {newMacroPressType === 'tap' && (
-                      <div className="flex items-center gap-1.5 flex-wrap mt-2 p-2 rounded-xl bg-accent-950/30 border border-accent-500/30 text-xs">
-                        <span className="text-[11px] text-accent-300 shrink-0 font-semibold flex items-center gap-1">
-                          <Zap className="w-3.5 h-3.5 text-accent-400" />
-                          Durée de l&apos;appui :
-                        </span>
-                        {[50, 100, 180, 250, 300, 500].map((ms) => (
-                          <button
-                            key={ms}
-                            type="button"
-                            onClick={() => setNewMacroTapDurationMs(ms)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition ${
-                              newMacroTapDurationMs === ms
-                                ? 'bg-accent-500 text-slate-950 font-bold shadow-sm'
-                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                            }`}
-                          >
-                            {ms}ms{ms === 180 ? ' (défaut)' : ''}
-                          </button>
-                        ))}
-                        <div className="flex items-center gap-1 ml-auto shrink-0 pl-1.5 border-l border-accent-500/30">
-                          <input
-                            type="number"
-                            min="20"
-                            max="2000"
-                            step="10"
-                            value={newMacroTapDurationMs}
-                            onChange={(e) =>
-                              setNewMacroTapDurationMs(
-                                Math.max(20, parseInt(e.target.value, 10) || 20)
-                              )
-                            }
-                            className="w-14 px-1.5 py-0.5 text-center font-mono text-xs bg-slate-900 border border-accent-500/40 rounded-lg text-accent-200 font-bold focus:outline-none focus:border-accent-400"
-                            title="Valeur personnalisée en millisecondes"
-                          />
-                          <span className="text-[11px] font-mono text-accent-400 font-bold">ms</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {newMacroPressType === 'hold' && (
-                      <div className="flex items-center gap-2 mt-2 p-2 rounded-xl bg-purple-950/30 border border-purple-500/30 text-xs">
-                        <span className="text-[11px] text-purple-300 shrink-0">Durée du maintien :</span>
-                        {[1.0, 1.5, 2.0, 3.0].map((dur) => (
-                          <button
-                            key={dur}
-                            type="button"
-                            onClick={() => setNewMacroDuration(dur)}
-                            className={`px-2 py-0.5 rounded-lg text-[11px] font-mono transition ${
-                              newMacroDuration === dur
-                                ? 'bg-purple-600 text-white font-bold'
-                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                            }`}
-                          >
-                            {dur}s
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">
-                    Phrases vocales déclencheuses (séparées par une virgule)
-                  </label>
-                  <input
-                    type="text"
-                    value={newMacroPhrases}
-                    onChange={(e) => setNewMacroPhrases(e.target.value)}
-                    placeholder="Ex: sort le train, rentre le train, atterrissage"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accent-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">
-                    Réponse vocale de confirmation du compagnon
-                  </label>
-                  <input
-                    type="text"
-                    value={newMacroReply}
-                    onChange={(e) => setNewMacroReply(e.target.value)}
-                    placeholder="Ex: Train d'atterrissage actionné, Commandant."
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-accent-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={!newMacroKey.trim()}
-                    onClick={() =>
-                      handleTestSingleKey(
-                        newMacroKey,
-                        'new_test',
-                        newMacroPressType,
-                        newMacroPressType === 'hold'
-                          ? newMacroDuration
-                          : newMacroTapDurationMs / 1000
-                      )
-                    }
-                    className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-cyan-300 font-semibold rounded-xl text-xs transition active:scale-95 border border-slate-700 flex items-center justify-center gap-1.5 shrink-0"
-                    title="Tester la frappe avec la durée sélectionnée"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    <span>
-                      Tester [{newMacroKey.toUpperCase() || '?'}] {newMacroPressType === 'hold' ? `(${newMacroDuration}s)` : `(${newMacroTapDurationMs}ms)`}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddMacroOpen(false)}
-                    className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition shrink-0"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!newMacroName.trim() || !newMacroKey.trim() || !newMacroPhrases.trim()}
-                    className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:hover:bg-cyan-600 text-white font-semibold rounded-xl text-xs transition active:scale-95 shadow-md shadow-cyan-600/30"
-                  >
-                    Ajouter cette commande vocale
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
           {/* TAB 6: SAUVEGARDE & MISES À JOUR */}
           {activeTab === 'backup' && (
