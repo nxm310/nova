@@ -930,243 +930,252 @@ export default function CompanionApp() {
 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-slate-950 text-slate-100 overflow-hidden relative selection:bg-cyan-500/30">
-      {/* HEADER COCKPIT ÉPURÉ, UNIFORME & ÉQUILIBRÉ */}
-      <header className="flex items-center justify-between px-3 md:px-5 py-2 bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-xl z-30 safe-top select-none shrink-0 gap-2">
-        {/* Section GAUCHE : Identité Co-Pilote & Pont PC */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative shrink-0">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg bg-gradient-to-br from-cyan-500/20 to-indigo-600/30 border transition-all duration-300 ${
-                isPlayingAudio
-                  ? 'border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-500/20 scale-105'
-                  : 'border-slate-700/80'
+      {/* HEADER COCKPIT DOUBLE ÉTAGE : AÉRÉ, ÉLÉGANT & ERGONOMIQUE POUR ÉCRAN VERTICAL */}
+      <header className="flex flex-col bg-slate-900/95 border-b border-slate-800/80 backdrop-blur-xl z-30 safe-top select-none shrink-0 shadow-lg">
+        {/* ÉTAGE 1 : HUD STATUT, TÉLÉMÉTRIE & IDENTITÉ */}
+        <div className="flex items-center justify-between px-3.5 sm:px-5 py-2 border-b border-slate-800/50 gap-2">
+          {/* Identité Co-Pilote */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative shrink-0">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg bg-gradient-to-br from-cyan-500/20 to-indigo-600/30 border transition-all duration-300 ${
+                  isPlayingAudio
+                    ? 'border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-500/20 scale-105'
+                    : 'border-slate-700/80'
+                }`}
+              >
+                {profile.avatar}
+              </div>
+              <span
+                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${
+                  isPlayingAudio
+                    ? 'bg-cyan-400 animate-pulse'
+                    : isRecording
+                    ? 'bg-rose-400 animate-ping'
+                    : 'bg-emerald-400'
+                }`}
+              />
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="font-bold text-sm text-white tracking-tight truncate">
+                  {profile.name}
+                </h1>
+                <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/20 uppercase tracking-wider">
+                  {currentPreset?.name.split('&')[0].trim() || 'Co-Pilote'}
+                </span>
+                {/* Synchronisation de version */}
+                <button
+                  type="button"
+                  onClick={handleCheckUpdate}
+                  className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 font-bold transition active:scale-95 group cursor-pointer"
+                  title="Vérifier la version de Nova"
+                >
+                  <span>v{bridgeInfo?.version || APP_VERSION}</span>
+                  <RefreshCw className={`w-2.5 h-2.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500 ${updateChecking ? 'animate-spin text-cyan-200' : ''}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Télémétrie Live, Visualiseur & Pont PC */}
+          <div className="flex items-center gap-2 shrink-0">
+            <AudioVisualizer isPlaying={isPlayingAudio} isListening={isRecording} />
+
+            {/* Statut Pont PC Clavier */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono border transition shadow-sm ${
+                bridgeConnected === true
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                  : bridgeConnected === false
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20 animate-pulse'
+                  : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+              }`}
+              title={
+                bridgeConnected === true
+                  ? '✓ Pont PC actif (Port 5005). Vos ordres vocaux commandent Star Citizen !'
+                  : '⚠️ Pont PC déconnecté. Cliquez pour voir comment lancer DEMARRER_NOVA.bat.'
+              }
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  bridgeConnected === true
+                    ? 'bg-emerald-400 shadow-sm shadow-emerald-400 animate-pulse'
+                    : bridgeConnected === false
+                    ? 'bg-rose-400'
+                    : 'bg-amber-400'
+                }`}
+              />
+              <span className="font-semibold">
+                {bridgeConnected === true
+                  ? 'Pont PC Prêt'
+                  : bridgeConnected === false
+                  ? 'Pont Déconnecté'
+                  : 'Pont PC...'}
+              </span>
+            </button>
+
+            {/* Télémétrie Tokens & Coût Réel */}
+            <TelemetryWidget />
+          </div>
+        </div>
+
+        {/* ÉTAGE 2 : ACTIONS TACTIQUES COCKPIT & OUTILS UTILITAIRES */}
+        <div className="flex items-center justify-between px-3.5 sm:px-5 py-2 gap-2">
+          {/* Groupe GAUCHE : Actions Principales Cockpit (Grands boutons tactiles h-10) */}
+          <div className="flex items-center gap-2">
+            {/* Bouton Appel Direct Mains-Libres (Honneur au bouton principal) */}
+            <button
+              type="button"
+              onClick={startHandsFreeCall}
+              className="h-10 px-3.5 sm:px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-cyan-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/25 active:scale-95 transition flex items-center gap-2"
+              title="Démarrer un appel vocal direct sans avoir à appuyer sur les boutons"
+            >
+              <Phone className="w-4 h-4 text-cyan-200 animate-pulse" />
+              <span className="font-bold tracking-wide">Appel Direct</span>
+              <span className="hidden sm:inline text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-cyan-100">Live</span>
+            </button>
+
+            {/* Bascule Cockpit Touch Deck */}
+            <button
+              type="button"
+              onClick={() => setIsDeckOpen(!isDeckOpen)}
+              className={`h-10 px-3 sm:px-3.5 rounded-xl border text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-2 ${
+                isDeckOpen
+                  ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-cyan-500/20'
+                  : 'bg-slate-800/90 hover:bg-slate-700/90 border-slate-700/80 text-slate-300'
+              }`}
+              title={isDeckOpen ? 'Masquer le panneau Touch Deck' : 'Ouvrir le panneau Touch Deck des raccourcis Star Citizen'}
+            >
+              <Gamepad2 className="w-4 h-4 text-cyan-400" />
+              <span>Commandes Vaisseau</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 font-mono text-cyan-400 border border-slate-700">
+                {activeMacros.filter((m) => m.enabled).length}
+              </span>
+            </button>
+
+            {/* Bouton Vision Écran */}
+            <button
+              type="button"
+              onClick={handleToggleVision}
+              className={`h-10 px-3 rounded-xl border text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5 ${
+                isVisionActive
+                  ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20 animate-pulse'
+                  : 'bg-slate-800/90 hover:bg-slate-700/90 border-slate-700/80 text-slate-300'
+              }`}
+              title={
+                isVisionActive
+                  ? "Désactiver le flux vidéo d'écran"
+                  : "Activer la vision d'écran (partager une fenêtre ou tout l'écran avec votre compagnon)"
+              }
+            >
+              {isVisionActive ? (
+                <Eye className="w-4 h-4 text-white" />
+              ) : (
+                <EyeOff className="w-4 h-4 text-slate-400" />
+              )}
+              <span className="hidden sm:inline">
+                {isVisionActive ? 'Vision ON' : 'Vision'}
+              </span>
+            </button>
+          </div>
+
+          {/* Groupe DROIT : Outils & Configuration (h-10 pour une cohérence parfaite) */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Bascule lecture auto voix */}
+            <button
+              type="button"
+              onClick={() => {
+                const updated = { ...profile, autoPlayVoice: !profile.autoPlayVoice };
+                setProfile(updated);
+                storage.saveProfile(updated);
+              }}
+              title={profile.autoPlayVoice ? 'Voix activée (cliquer pour couper)' : 'Voix coupée (cliquer pour activer)'}
+              className={`w-10 h-10 rounded-xl border transition active:scale-95 flex items-center justify-center ${
+                profile.autoPlayVoice
+                  ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25'
+                  : 'bg-slate-800/70 border-slate-700/70 text-slate-400 hover:bg-slate-800'
               }`}
             >
-              {profile.avatar}
-            </div>
-            <span
-              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${
-                isPlayingAudio
-                  ? 'bg-cyan-400 animate-pulse'
-                  : isRecording
-                  ? 'bg-rose-400 animate-ping'
-                  : 'bg-emerald-400'
-              }`}
-            />
-          </div>
+              {profile.autoPlayVoice ? (
+                <Volume2 className="w-4 h-4" />
+              ) : (
+                <VolumeX className="w-4 h-4" />
+              )}
+            </button>
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-bold text-sm text-white tracking-tight truncate">
-                {profile.name}
-              </h1>
-              <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/20 uppercase tracking-wider">
-                {currentPreset?.name.split('&')[0].trim() || 'Co-Pilote'}
-              </span>
-              {/* Bouton de synchronisation et vérification de version */}
-              <button
-                type="button"
-                onClick={handleCheckUpdate}
-                className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 font-bold transition active:scale-95 group cursor-pointer"
-                title="Cliquer pour vérifier si la version est à jour"
-              >
-                <span>v{bridgeInfo?.version || APP_VERSION}</span>
-                <RefreshCw className={`w-2.5 h-2.5 text-cyan-400 group-hover:rotate-180 transition-transform duration-500 ${updateChecking ? 'animate-spin text-cyan-200' : ''}`} />
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <AudioVisualizer isPlaying={isPlayingAudio} isListening={isRecording} />
-              {/* Statut Pont PC Clavier */}
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen(true)}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono border transition ${
-                  bridgeConnected === true
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                    : bridgeConnected === false
-                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20 animate-pulse'
-                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
-                }`}
-                title={
-                  bridgeConnected === true
-                    ? `✓ Pont PC actif (Port 5005). Vos ordres vocaux commandent Star Citizen !`
-                    : `⚠️ Pont PC déconnecté. Cliquez pour voir comment lancer DEMARRER_NOVA.bat sur votre PC.`
+            {/* Bouton Effacer la conversation */}
+            <button
+              type="button"
+              onClick={() => {
+                if (messages.length === 0) return;
+                if (window.confirm("Effacer les messages affichés à l'écran ?")) {
+                  updateMessages([]);
+                  storage.clearMessages();
+                  audioManager.stopAll();
                 }
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    bridgeConnected === true
-                      ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
-                      : bridgeConnected === false
-                      ? 'bg-rose-400'
-                      : 'bg-amber-400'
-                  }`}
-                />
-                <span>
-                  {bridgeConnected === true
-                    ? 'Pont PC Prêt'
-                    : bridgeConnected === false
-                    ? 'Pont Déconnecté'
-                    : 'Pont PC...'}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Section CENTRE : Actions Principales Cockpit (hauteur uniforme h-9) */}
-        <div className="flex items-center gap-1.5">
-          {/* Bascule Cockpit Touch Deck (Sidebar) */}
-          <button
-            type="button"
-            onClick={() => setIsDeckOpen(!isDeckOpen)}
-            className={`h-9 px-2.5 sm:px-3 rounded-xl border text-xs font-semibold shadow-sm transition active:scale-95 flex items-center gap-1.5 ${
-              isDeckOpen
-                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-200 shadow-cyan-500/15'
-                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700/80 text-slate-300'
-            }`}
-            title={isDeckOpen ? 'Masquer le Touch Deck des touches' : 'Afficher le Touch Deck des touches Star Citizen'}
-          >
-            <Gamepad2 className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Commandes Vaisseau</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 font-mono text-cyan-400 border border-slate-700">
-              {activeMacros.filter((m) => m.enabled).length}
-            </span>
-          </button>
-
-          {/* Bouton Appel Direct Mains-Libres */}
-          <button
-            type="button"
-            onClick={startHandsFreeCall}
-            className="h-9 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-cyan-500/20 active:scale-95 transition flex items-center gap-1.5"
-            title="Démarrer un appel vocal direct sans avoir à appuyer sur les boutons"
-          >
-            <Phone className="w-3.5 h-3.5 text-cyan-200 animate-pulse" />
-            <span className="hidden sm:inline">Appel Direct</span>
-            <span className="sm:hidden">Appel</span>
-          </button>
-
-          {/* Bouton Partage / Vision Écran */}
-          <button
-            type="button"
-            onClick={handleToggleVision}
-            className={`h-9 px-2.5 sm:px-3 rounded-xl border text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5 ${
-              isVisionActive
-                ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20 animate-pulse'
-                : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700/80 text-slate-300'
-            }`}
-            title={
-              isVisionActive
-                ? "Désactiver la vision d'écran"
-                : "Activer la vision d'écran (partager une fenêtre ou tout l'écran avec votre compagnon)"
-            }
-          >
-            {isVisionActive ? (
-              <Eye className="w-3.5 h-3.5 text-white" />
-            ) : (
-              <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-            )}
-            <span className="hidden md:inline">
-              {isVisionActive ? 'Vision ON' : 'Vision'}
-            </span>
-          </button>
-        </div>
-
-        {/* Section DROITE : Utilitaires & Configuration (hauteur uniforme h-9) */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Télémétrie Live Tokens & Coût Réel */}
-          <TelemetryWidget />
-
-          {/* Bascule lecture auto voix */}
-          <button
-            type="button"
-            onClick={() => {
-              const updated = { ...profile, autoPlayVoice: !profile.autoPlayVoice };
-              setProfile(updated);
-              storage.saveProfile(updated);
-            }}
-            title={profile.autoPlayVoice ? 'Voix activée (cliquer pour couper)' : 'Voix coupée (cliquer pour activer)'}
-            className={`w-9 h-9 rounded-xl border transition active:scale-95 flex items-center justify-center ${
-              profile.autoPlayVoice
-                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25'
-                : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800'
-            }`}
-          >
-            {profile.autoPlayVoice ? (
-              <Volume2 className="w-4 h-4" />
-            ) : (
-              <VolumeX className="w-4 h-4" />
-            )}
-          </button>
-
-          {/* Bouton Effacer la conversation */}
-          <button
-            type="button"
-            onClick={() => {
-              if (messages.length === 0) return;
-              if (window.confirm("Effacer les messages affichés à l'écran ?")) {
-                updateMessages([]);
-                storage.clearMessages();
-                audioManager.stopAll();
+              }}
+              disabled={messages.length === 0}
+              title={
+                messages.length > 0
+                  ? "Effacer les messages affichés à l'écran"
+                  : "Aucun message à effacer"
               }
-            }}
-            disabled={messages.length === 0}
-            title={
-              messages.length > 0
-                ? "Effacer les messages affichés à l'écran"
-                : "Aucun message à effacer"
-            }
-            className="w-9 h-9 rounded-xl bg-slate-800/60 hover:bg-red-500/20 hover:border-red-500/40 border border-slate-700/60 text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:hover:bg-slate-800/60 disabled:hover:text-slate-400 disabled:cursor-not-allowed transition active:scale-95 flex items-center justify-center"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+              className="w-10 h-10 rounded-xl bg-slate-800/70 hover:bg-red-500/20 hover:border-red-500/40 border border-slate-700/70 text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:hover:bg-slate-800/70 disabled:hover:text-slate-400 disabled:cursor-not-allowed transition active:scale-95 flex items-center justify-center"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
 
-          {/* Touche Sauvegarde Rapide */}
-          <button
-            type="button"
-            onClick={handleQuickSave}
-            className="hidden sm:flex w-9 h-9 rounded-xl bg-purple-600/15 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 transition active:scale-95 items-center justify-center"
-            title="Sauvegarder mes réglages (touches, profil, clé API) dans un fichier .json"
-          >
-            <Save className="w-4 h-4" />
-          </button>
+            {/* Touche Sauvegarde Rapide */}
+            <button
+              type="button"
+              onClick={handleQuickSave}
+              className="w-10 h-10 rounded-xl bg-purple-600/15 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 transition active:scale-95 flex items-center justify-center"
+              title="Sauvegarder mes réglages (touches, profil, clé API) dans un fichier .json"
+            >
+              <Save className="w-4 h-4" />
+            </button>
 
-          {/* Touche Restauration Rapide */}
-          <label
-            className="hidden sm:flex w-9 h-9 rounded-xl bg-cyan-600/15 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 transition active:scale-95 cursor-pointer items-center justify-center"
-            title="Restaurer mes réglages depuis un fichier de sauvegarde (.json)"
-          >
-            <FolderOpen className="w-4 h-4" />
-            <input
-              type="file"
-              accept=".json,application/json"
-              onChange={handleQuickRestore}
-              className="hidden"
-            />
-          </label>
+            {/* Touche Restauration Rapide */}
+            <label
+              className="w-10 h-10 rounded-xl bg-cyan-600/15 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 transition active:scale-95 cursor-pointer flex items-center justify-center"
+              title="Restaurer mes réglages depuis un fichier de sauvegarde (.json)"
+            >
+              <FolderOpen className="w-4 h-4" />
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={handleQuickRestore}
+                className="hidden"
+              />
+            </label>
 
-          <div className="h-4 w-px bg-slate-800 hidden sm:block mx-0.5" />
+            <div className="h-5 w-px bg-slate-800 mx-0.5 hidden xs:block" />
 
-          {/* Touche Mise à Jour Automatique 1-Clic */}
-          <button
-            type="button"
-            onClick={handleCheckUpdate}
-            className="h-9 px-2.5 sm:px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5"
-            title="Rechercher et synchroniser les mises à jour"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-blue-300 shrink-0 ${updateChecking ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Mise à jour</span>
-          </button>
+            {/* Touche Mise à Jour Automatique 1-Clic */}
+            <button
+              type="button"
+              onClick={handleCheckUpdate}
+              className="h-10 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5"
+              title="Rechercher et synchroniser les mises à jour"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-blue-300 shrink-0 ${updateChecking ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">Mise à jour</span>
+            </button>
 
-          {/* Bouton Paramètres */}
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-200 transition active:scale-95 flex items-center justify-center"
-            title="Paramètres de Nova & Touches"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+            {/* Bouton Paramètres */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-10 h-10 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95 flex items-center justify-center shadow-sm"
+              title="Paramètres de Nova & Touches"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1334,99 +1343,252 @@ export default function CompanionApp() {
           <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 relative z-10">
             <div className="max-w-4xl mx-auto w-full">
               {messages.length === 0 ? (
-                /* ACCUEIL HOLOGRAPHIQUE STAR CITIZEN */
-                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 py-6 animate-fade-in space-y-6">
-                  {/* Hologram Avatar Orb */}
-                  <div className="relative">
-                    <div className="absolute -inset-2 rounded-full bg-cyan-500/20 blur-xl animate-pulse" />
-                    <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-600/30 via-indigo-600/30 to-purple-600/30 border border-cyan-500/40 flex items-center justify-center text-4xl shadow-2xl shadow-cyan-500/20">
+                /* ACCUEIL HOLOGRAPHIQUE & CONSOLE TACTIQUE STAR CITIZEN */
+                <div className="flex flex-col items-center min-h-[70vh] text-center px-2 sm:px-4 py-4 animate-fade-in space-y-6">
+                  {/* Hologram Avatar Orb & Cyber Ring */}
+                  <div className="relative pt-2">
+                    <div className="absolute -inset-4 rounded-full bg-cyan-500/20 blur-2xl animate-pulse" />
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-cyan-600/30 via-slate-900/90 to-purple-600/30 border-2 border-cyan-400/50 flex items-center justify-center text-4xl sm:text-5xl shadow-2xl shadow-cyan-500/30 ring-4 ring-cyan-500/10">
                       {profile.avatar}
                     </div>
                   </div>
 
-                  <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight mb-2">
-                      Système de Bord & Co-Pilote {profile.name}
+                  <div className="space-y-1.5">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/70 border border-cyan-500/40 text-[11px] font-mono text-cyan-300 shadow-sm">
+                      <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                      <span>CONSOLE TACTIQUE EMBARQUÉE</span>
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                      Système de Bord {profile.name}
                     </h2>
-                    <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-                      Contrôle vocal direct de Star Citizen, exécution de macros clavier et analyse IA en temps réel.
+                    <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
+                      Pilotage vocal Star Citizen, frappes physiques matérielles DirectInput et assistance IA en temps réel.
                     </p>
                   </div>
 
-                  {/* Badges d'état rapide */}
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
-                      <Zap className="w-3 h-3 text-cyan-400" />
-                      <span>Touches Star Citizen Prêtes</span>
+                  {/* Badges d'état opérationnels */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 shadow-sm">
+                      <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>DirectInput Prêt (Port 5005)</span>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
-                      <Mic className="w-3 h-3 text-emerald-400" />
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 shadow-sm">
+                      <Mic className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       <span>Reconnaissance Vocale Directe</span>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
-                      <Phone className="w-3 h-3 text-indigo-400" />
-                      <span>Mode Appel Mains-Libres</span>
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                      <span>Modèle Gemini 3.8 LIVE</span>
                     </div>
                   </div>
 
-                  {/* Actions Rapides Vocales (Star Citizen Chips) */}
-                  <div className="w-full max-w-lg space-y-2 pt-2">
-                    <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
-                      Ordres de vol recommandés (cliquez ou dites-les) :
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {[
-                        {
-                          title: 'Allumer le vaisseau',
-                          prompt: 'Allume le vaisseau',
-                          key: 'U',
-                          icon: Rocket,
-                        },
-                        {
-                          title: "Train d'atterrissage",
-                          prompt: "Rentre le train d'atterrissage",
-                          key: 'N',
-                          icon: Shield,
-                        },
-                        {
-                          title: 'Phares du vaisseau',
-                          prompt: 'Allume les phares',
-                          key: 'L',
-                          icon: Lightbulb,
-                        },
-                        {
-                          title: 'Tour ATC (Atterrissage)',
-                          prompt: "Demande l'atterrissage à la tour",
-                          key: 'ALT+N',
-                          icon: Radio,
-                        },
-                        {
-                          title: 'Carte Stellaire (StarMap)',
-                          prompt: 'Ouvre la carte stellaire',
-                          key: 'F2',
-                          icon: Compass,
-                        },
-                        {
-                          title: 'Moteur Quantique',
-                          prompt: 'Active le mode quantum',
-                          key: 'B',
-                          icon: Zap,
-                        },
-                      ].map((action, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleSendMessage(action.prompt)}
-                          className="text-left p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/40 text-xs text-slate-300 transition flex items-center justify-between group shadow-sm"
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <action.icon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                            <span className="truncate font-medium">{action.prompt}</span>
-                          </div>
-                          <span className="px-1.5 py-0.2 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-cyan-300 shrink-0 ml-1">
-                            {action.key}
-                          </span>
-                        </button>
-                      ))}
+                  {/* BANDEAU MULTI-ACTIONS VOCALES */}
+                  <div className="w-full max-w-2xl bg-gradient-to-r from-cyan-950/60 via-slate-900/80 to-indigo-950/60 border border-cyan-500/30 rounded-2xl p-3 text-left shadow-lg flex items-start sm:items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs">
+                      <div className="font-bold text-cyan-200">Ordres Multi-Actions supportés :</div>
+                      <div className="text-slate-300 text-[11px] mt-0.5">
+                        Vous pouvez ordonner plusieurs actions dans une seule phrase, ex :
+                        <span className="text-cyan-300 italic"> « Allume les phares et sors le train d&apos;atterrissage »</span> ou
+                        <span className="text-cyan-300 italic"> « Lance des leurres et prépare le quantum »</span>.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GRILLE DE TUILES COCKPIT CATÉGORISÉES */}
+                  <div className="w-full max-w-3xl space-y-4 pt-1">
+                    {/* SECTION 1 : VOL & PROPULSION */}
+                    <div className="text-left space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400">
+                        <Rocket className="w-3.5 h-3.5" />
+                        <span>1. Vol & Propulsion</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {[
+                          {
+                            title: 'Allumage Vaisseau',
+                            prompt: 'Allume le vaisseau',
+                            key: 'U',
+                            icon: Rocket,
+                            desc: 'Démarrage réacteurs & puissance',
+                          },
+                          {
+                            title: "Train d'atterrissage",
+                            prompt: "Rentre le train d'atterrissage",
+                            key: 'N',
+                            icon: Shield,
+                            desc: 'Déploiement / Rétraction',
+                          },
+                          {
+                            title: 'Moteur Quantique (QT)',
+                            prompt: 'Active le mode quantum',
+                            key: 'B',
+                            icon: Zap,
+                            desc: 'Calibrage & saut de navigation',
+                          },
+                          {
+                            title: 'Cruise Control (Régulateur)',
+                            prompt: 'Active le régulateur de vitesse',
+                            key: 'C',
+                            icon: Compass,
+                            desc: 'Maintien de la vitesse de vol',
+                          },
+                        ].map((action, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleSendMessage(action.prompt)}
+                            className="p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-400/60 transition-all duration-200 text-left group shadow-sm flex items-center justify-between active:scale-98"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition shrink-0">
+                                <action.icon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-xs text-white group-hover:text-cyan-200 truncate">
+                                  {action.title}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate">
+                                  « {action.prompt} »
+                                </div>
+                              </div>
+                            </div>
+                            <span className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono font-bold text-cyan-300 group-hover:border-cyan-400 shrink-0 ml-2 shadow-inner">
+                              {action.key}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* SECTION 2 : DÉFENSE & SÉCURITÉ */}
+                    <div className="text-left space-y-2 pt-1">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-400">
+                        <Shield className="w-3.5 h-3.5" />
+                        <span>2. Défense & Sécurité</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {[
+                          {
+                            title: 'Boucliers Énergétiques',
+                            prompt: 'Active les boucliers',
+                            key: 'O',
+                            icon: Shield,
+                            desc: 'Générateurs de protection',
+                          },
+                          {
+                            title: 'Leurres Thermiques (Decoy)',
+                            prompt: 'Lance des leurres thermiques',
+                            key: 'G',
+                            icon: Sparkles,
+                            desc: 'Déviation de missiles',
+                          },
+                          {
+                            title: 'Brouillage Radar (Noise)',
+                            prompt: 'Brouille les radars',
+                            key: 'H',
+                            icon: Radio,
+                            desc: 'Écran de paillettes chaff',
+                          },
+                          {
+                            title: 'Armement & Systèmes',
+                            prompt: 'Armes prêtes',
+                            key: 'P',
+                            icon: Zap,
+                            desc: 'Alimentation des canons',
+                          },
+                        ].map((action, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleSendMessage(action.prompt)}
+                            className="p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-purple-400/60 transition-all duration-200 text-left group shadow-sm flex items-center justify-between active:scale-98"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:scale-105 transition shrink-0">
+                                <action.icon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-xs text-white group-hover:text-purple-200 truncate">
+                                  {action.title}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate">
+                                  « {action.prompt} »
+                                </div>
+                              </div>
+                            </div>
+                            <span className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono font-bold text-purple-300 group-hover:border-purple-400 shrink-0 ml-2 shadow-inner">
+                              {action.key}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* SECTION 3 : NAVIGATION & COMMUNICATIONS */}
+                    <div className="text-left space-y-2 pt-1">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+                        <Radio className="w-3.5 h-3.5" />
+                        <span>3. Navigation & Communications</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {[
+                          {
+                            title: 'Tour ATC (Atterrissage)',
+                            prompt: "Demande l'atterrissage à la tour",
+                            key: 'ALT+N',
+                            icon: Radio,
+                            desc: 'Assignation de hangar / pad',
+                          },
+                          {
+                            title: 'Carte Stellaire (StarMap)',
+                            prompt: 'Ouvre la carte stellaire',
+                            key: 'F2',
+                            icon: Compass,
+                            desc: 'Itinéraire & navigation quantique',
+                          },
+                          {
+                            title: 'Projecteurs & Phares',
+                            prompt: 'Allume les phares',
+                            key: 'L',
+                            icon: Lightbulb,
+                            desc: 'Éclairage extérieur du cockpit',
+                          },
+                          {
+                            title: 'Portes & Sas de Bord',
+                            prompt: 'Ouvre les portes',
+                            key: 'K',
+                            icon: ExternalLink,
+                            desc: 'Verrouillage / Déverrouillage',
+                          },
+                        ].map((action, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleSendMessage(action.prompt)}
+                            className="p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-400/60 transition-all duration-200 text-left group shadow-sm flex items-center justify-between active:scale-98"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition shrink-0">
+                                <action.icon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-xs text-white group-hover:text-emerald-200 truncate">
+                                  {action.title}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate">
+                                  « {action.prompt} »
+                                </div>
+                              </div>
+                            </div>
+                            <span className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono font-bold text-emerald-300 group-hover:border-emerald-400 shrink-0 ml-2 shadow-inner">
+                              {action.key}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1536,8 +1698,37 @@ export default function CompanionApp() {
           </main>
 
           {/* BARRE DE SAISIE INFERIEURE FLOTTANTE COCKPIT */}
-          <footer className="p-3 md:p-4 bg-slate-900/90 border-t border-slate-800/90 backdrop-blur-xl safe-bottom shrink-0 relative z-20">
-            <div className="max-w-4xl mx-auto w-full">
+          <footer className="p-3 md:p-4 bg-slate-900/95 border-t border-slate-800/90 backdrop-blur-xl safe-bottom shrink-0 relative z-20 shadow-2xl">
+            <div className="max-w-4xl mx-auto w-full space-y-2.5">
+              {/* Chips de raccourcis tactiles rapides au-dessus de la saisie */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-xs">
+                <span className="text-[10px] font-mono uppercase text-slate-500 tracking-wider shrink-0 flex items-center gap-1 pr-1 select-none">
+                  <Zap className="w-3 h-3 text-cyan-400" />
+                  <span>Ordres rapides :</span>
+                </span>
+                {[
+                  { label: "Tour ATC", prompt: "Demande l'atterrissage à la tour", key: "ALT+N" },
+                  { label: "Phares", prompt: "Allume les phares", key: "L" },
+                  { label: "Train", prompt: "Rentre le train d'atterrissage", key: "N" },
+                  { label: "Boucliers", prompt: "Active les boucliers", key: "O" },
+                  { label: "Quantum", prompt: "Active le mode quantum", key: "B" },
+                  { label: "Leurres", prompt: "Lance des leurres thermiques", key: "G" },
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendMessage(chip.prompt)}
+                    className="shrink-0 px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 hover:border-cyan-500/50 text-[11px] text-slate-300 hover:text-white transition flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={`Exécuter : « ${chip.prompt} »`}
+                  >
+                    <span>{chip.label}</span>
+                    <span className="px-1.5 py-0.2 rounded bg-slate-950 font-mono text-[9px] text-cyan-400 font-bold border border-slate-700">
+                      {chip.key}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1549,14 +1740,14 @@ export default function CompanionApp() {
                 <button
                   type="button"
                   onClick={toggleVoiceRecording}
-                  className={`p-2.5 md:p-3 rounded-xl border transition flex-shrink-0 relative ${
+                  className={`h-12 w-12 rounded-2xl border transition-all duration-200 flex items-center justify-center flex-shrink-0 relative shadow-md active:scale-95 ${
                     isRecording
-                      ? 'bg-rose-500/20 border-rose-500 text-rose-400 animate-pulse shadow-lg shadow-rose-500/20'
-                      : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                      ? 'bg-rose-500/20 border-rose-500 text-rose-400 animate-pulse shadow-rose-500/30 ring-2 ring-rose-500/40'
+                      : 'bg-slate-800/90 hover:bg-slate-700/90 border-slate-700 text-slate-200 hover:text-white'
                   }`}
                   title={isRecording ? 'Arrêter la dictée' : 'Parler au micro'}
                 >
-                  {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5 text-cyan-400" />}
                 </button>
 
                 {/* Champ de commande */}
@@ -1570,7 +1761,7 @@ export default function CompanionApp() {
                         ? 'Écoute en cours...'
                         : `Ordre de vol ou message pour ${profile.name}...`
                     }
-                    className="w-full px-4 py-2.5 md:py-3 bg-slate-950 border border-slate-700/80 rounded-xl focus:outline-none focus:border-cyan-500 text-sm text-white placeholder-slate-500 transition shadow-inner font-sans"
+                    className="w-full h-12 px-4 bg-slate-950/90 border border-slate-700/80 rounded-2xl focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/40 text-sm text-white placeholder-slate-500 transition shadow-inner font-sans"
                   />
                 </div>
 
@@ -1578,10 +1769,11 @@ export default function CompanionApp() {
                 <button
                   type="submit"
                   disabled={!inputText.trim() || isLoading}
-                  className="p-2.5 md:p-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:hover:bg-cyan-600 text-white transition shadow-lg shadow-cyan-600/30 flex-shrink-0"
+                  className="h-12 px-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 disabled:opacity-40 disabled:hover:from-cyan-600 disabled:hover:to-indigo-600 text-white font-semibold transition shadow-lg shadow-cyan-600/25 flex items-center justify-center gap-1.5 flex-shrink-0 active:scale-95"
                   title="Envoyer la commande"
                 >
-                  <Send className="w-5 h-5" />
+                  <Send className="w-4 h-4" />
+                  <span className="hidden sm:inline text-xs">Envoyer</span>
                 </button>
               </form>
             </div>
