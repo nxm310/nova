@@ -11,6 +11,7 @@ import { storage } from '@/lib/storage';
 import { audioManager } from '@/lib/audio';
 import { cleanTextForSpeech } from '@/lib/speechUtils';
 import { SettingsModal } from '@/components/SettingsModal';
+import { InstallModal } from '@/components/InstallModal';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { ConversationModal, LiveCallState } from '@/components/ConversationModal';
@@ -99,6 +100,36 @@ export default function CompanionApp() {
     };
   } | null>(null);
   const [updateToast, setUpdateToast] = useState<string | null>(null);
+
+  // États pour l'Installation de l'Application (PWA & Raccourci Bureau)
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  // Capture de l'événement PWA avant installation
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
+
+  const handleTriggerInstall = async () => {
+    if (!installPrompt) return;
+    try {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstallModalOpen(false);
+      }
+      setInstallPrompt(null);
+    } catch (e) {
+      console.warn('Erreur lors du déclenchement PWA :', e);
+    }
+  };
 
   // États pour le Mode Appel Mains-Libres continu
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
@@ -1193,6 +1224,17 @@ export default function CompanionApp() {
               <span className="hidden md:inline">Mise à jour</span>
             </button>
 
+            {/* Touche Installer l'App PWA & Raccourci Bureau */}
+            <button
+              type="button"
+              onClick={() => setIsInstallModalOpen(true)}
+              className="h-10 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-200 text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5"
+              title="Installer Nova sur votre PC (PWA ou Raccourci Bureau) ou Tablette Cockpit"
+            >
+              <Download className={`w-3.5 h-3.5 text-emerald-300 shrink-0 ${installPrompt ? 'animate-bounce text-emerald-400' : ''}`} />
+              <span className="hidden md:inline">Installer l'App</span>
+            </button>
+
             {/* Bouton Paramètres */}
             <button
               type="button"
@@ -1810,6 +1852,15 @@ export default function CompanionApp() {
 
       {/* Prompt d'installation PWA mobile */}
       <PWAInstallPrompt />
+
+      {/* Modal d'Installation PWA & Raccourci Bureau */}
+      <InstallModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        canInstallPrompt={!!installPrompt}
+        onTriggerInstall={handleTriggerInstall}
+        bridgeConnected={bridgeConnected}
+      />
 
       {/* Modal des Paramètres */}
       <SettingsModal

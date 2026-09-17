@@ -35,7 +35,7 @@ except Exception:
     pass
 
 PORT = 5005
-CURRENT_VERSION = "1.3.4"
+CURRENT_VERSION = "1.3.5"
 
 def find_root_dir() -> str:
     """Détermine le dossier racine de l'application Nova (dossier contenant Nova-StarCitizen.exe, DEMARRER_NOVA.bat ou package.json)."""
@@ -793,6 +793,76 @@ def synthesize_google_tts(text: str, lang: str = "fr") -> bytes:
 
     return result
 
+def create_windows_desktop_shortcut() -> dict:
+    """Crée un raccourci Windows 'Nova - Star Citizen.lnk' sur le Bureau de l'utilisateur."""
+    if not is_windows and sys.platform != 'win32':
+        return {
+            "success": False,
+            "error": "La création automatique de raccourci est optimisée pour Windows. Sur macOS/Linux, utilisez le signet ou le raccourci navigateur."
+        }
+
+    root_dir = find_root_dir()
+    exe_target = os.path.join(root_dir, "Nova-StarCitizen.exe")
+    bat_target = os.path.join(root_dir, "DEMARRER_NOVA.bat")
+    target_path = exe_target if os.path.exists(exe_target) else bat_target
+
+    if not os.path.exists(target_path):
+        return {"success": False, "error": f"Fichier de démarrage introuvable dans {root_dir}"}
+
+    # Chercher l'icône favicon.ico
+    icon_path = ""
+    for candidate in [
+        os.path.join(root_dir, "public", "favicon.ico"),
+        os.path.join(OUT_DIR, "favicon.ico"),
+        os.path.join(root_dir, "favicon.ico"),
+    ]:
+        if os.path.exists(candidate):
+            icon_path = os.path.abspath(candidate)
+            break
+
+    # Déterminer le dossier Bureau Windows
+    desktop = os.path.expandvars(r"%USERPROFILE%\Desktop")
+    if not os.path.exists(desktop):
+        desktop = os.path.expanduser("~/Desktop")
+
+    shortcut_path_escaped = shortcut_path.replace('"', '`"')
+    target_path_escaped = target_path.replace('"', '`"')
+    root_dir_escaped = root_dir.replace('"', '`"')
+    icon_path_escaped = icon_path.replace('"', '`"') if icon_path else ""
+
+    ps_script = f'''
+$ws = New-Object -ComObject WScript.Shell
+$sc = $ws.CreateShortcut("{shortcut_path_escaped}")
+$sc.TargetPath = "{target_path_escaped}"
+$sc.WorkingDirectory = "{root_dir_escaped}"
+$sc.Description = "Nova — Compagnon Star Citizen"
+'''
+    if icon_path_escaped:
+        ps_script += f'$sc.IconLocation = "{icon_path_escaped},0"\n'
+    ps_script += '$sc.Save()\n'
+
+    try:
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if res.returncode == 0 and os.path.exists(shortcut_path):
+            return {
+                "success": True,
+                "shortcutPath": shortcut_path,
+                "targetPath": target_path,
+                "message": f"Raccourci Nova créé sur votre Bureau : {shortcut_path}"
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Erreur PowerShell ({res.returncode}): {res.stderr.strip() or res.stdout.strip()}"
+            }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=OUT_DIR, **kwargs)
@@ -808,12 +878,22 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
         self._send_cors()
         self.end_headers()
 
+    def guess_type(self, path):
+        if str(path).endswith('manifest.json') or str(path).endswith('.webmanifest'):
+            return 'application/manifest+json; charset=utf-8'
+        if str(path).endswith('sw.js'):
+            return 'application/javascript; charset=utf-8'
+        return super().guess_type(path)
+
     def end_headers(self):
         # Éviter la mise en cache de index.html et des pages principales pour actualiser immédiatement les mises à jour
         if hasattr(self, 'path') and (self.path.endswith('.html') or self.path.endswith('/') or '/nova' in self.path):
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
+        if hasattr(self, 'path') and self.path.endswith('sw.js'):
+            self.send_header('Service-Worker-Allowed', '/')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()
 
     def translate_path(self, path):
@@ -893,6 +973,15 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                 self.send_response(502)
                 self._send_cors()
                 self.end_headers()
+            return
+
+        if clean in ('/api/desktop-shortcut', '/nova/api/desktop-shortcut'):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            res = create_windows_desktop_shortcut()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
         if clean in ('', '/'):
@@ -1036,6 +1125,15 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                 self._send_cors()
                 self.end_headers()
                 return
+
+        if clean in ('/api/desktop-shortcut', '/nova/api/desktop-shortcut'):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            res = create_windows_desktop_shortcut()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
 
         self.send_response(400)
         self._send_cors()

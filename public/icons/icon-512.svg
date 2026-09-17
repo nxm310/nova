@@ -1,52 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4c1d95" />
-      <stop offset="50%" stop-color="#7c3aed" />
-      <stop offset="100%" stop-color="#2563eb" />
+      <stop offset="0%" stop-color="#030712" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#083344" />
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="100%" stop-color="#06b6d4" />
     </linearGradient>
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="20" result="blur" />
+      <feGaussianBlur stdDeviation="16" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
-  <!-- Background with rounded corners -->
-  <rect width="512" height="512" rx="128" fill="url(#bg)" />
-  
-  <!-- Subtle Inner ring -->
-  <circle cx="256" cy="256" r="180" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" stroke-dasharray="8 8" />
-
-  <!-- Friend Silhouette / Spark Face -->
-  <g transform="translate(156, 140)">
-    <!-- Ears -->
-    <polygon points="20,70 60,0 90,60" fill="#f8fafc" opacity="0.9" />
-    <polygon points="180,70 140,0 110,60" fill="#f8fafc" opacity="0.9" />
-    
-    <!-- Head circle -->
-    <circle cx="100" cy="115" r="90" fill="#ffffff" filter="url(#glow)" />
-    
-    <!-- Eyes -->
-    <circle cx="68" cy="110" r="12" fill="#1e1b4b" />
-    <circle cx="132" cy="110" r="12" fill="#1e1b4b" />
-    <circle cx="72" cy="106" r="4" fill="#ffffff" />
-    <circle cx="136" cy="106" r="4" fill="#ffffff" />
-    
-    <!-- Smile -->
-    <path d="M 80 135 Q 100 155 120 135" fill="none" stroke="#1e1b4b" stroke-width="6" stroke-linecap="round" />
-    
-    <!-- Blushing cheeks -->
-    <circle cx="50" cy="125" r="10" fill="#f43f5e" opacity="0.4" />
-    <circle cx="150" cy="125" r="10" fill="#f43f5e" opacity="0.4" />
-  </g>
-
-  <!-- Sound Waves at the bottom -->
-  <g transform="translate(196, 380)" fill="#ffffff" opacity="0.85">
-    <rect x="0" y="8" width="8" height="24" rx="4" />
-    <rect x="20" y="0" width="8" height="40" rx="4" />
-    <rect x="40" y="12" width="8" height="16" rx="4" />
-    <rect x="60" y="4" width="8" height="32" rx="4" />
-    <rect x="80" y="14" width="8" height="12" rx="4" />
-    <rect x="100" y="2" width="8" height="36" rx="4" />
-    <rect x="120" y="8" width="8" height="24" rx="4" />
-  </g>
+  <rect width="512" height="512" rx="120" fill="url(#bg)" stroke="#06b6d4" stroke-width="4" stroke-opacity="0.3" />
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#06b6d4" stroke-width="5" stroke-opacity="0.5" stroke-dasharray="16 12" />
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#6366f1" stroke-width="3" stroke-opacity="0.4" />
+  <line x1="256" y1="40" x2="256" y2="80" stroke="#22d3ee" stroke-width="6" stroke-linecap="round" />
+  <line x1="256" y1="432" x2="256" y2="472" stroke="#22d3ee" stroke-width="6" stroke-linecap="round" />
+  <line x1="40" y1="256" x2="80" y2="256" stroke="#22d3ee" stroke-width="6" stroke-linecap="round" />
+  <line x1="432" y1="256" x2="472" y2="256" stroke="#22d3ee" stroke-width="6" stroke-linecap="round" />
+  <circle cx="256" cy="256" r="70" fill="#06b6d4" opacity="0.25" filter="url(#glow)" />
+  <polygon points="256,160 285,227 352,256 285,285 256,352 227,285 160,256 227,227" fill="url(#cyanGrad)" filter="url(#glow)" />
+  <polygon points="256,190 275,237 322,256 275,275 256,322 237,275 190,256 237,237" fill="#ffffff" />
+  <circle cx="256" cy="256" r="16" fill="#0891b2" />
 </svg>
