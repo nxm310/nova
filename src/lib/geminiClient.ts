@@ -1,5 +1,6 @@
 import { PERSONALITY_PRESETS } from '@/lib/constants';
 import { CompanionProfile, MemoryItem } from '@/types/companion';
+import { storage } from '@/lib/storage';
 
 export interface ChatRequestOptions {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -209,6 +210,17 @@ Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTI
     if (!data) {
       throw lastError || new Error("Impossible de joindre l'API Gemini après plusieurs tentatives.");
     }
+
+    if (data.usageMetadata) {
+      const pTokens = Number(data.usageMetadata.promptTokenCount) || 0;
+      const cTokens = Number(data.usageMetadata.candidatesTokenCount) || 0;
+      try {
+        storage.addTokens(pTokens, cTokens);
+      } catch {
+        // Ignorer erreur de stockage éventuelle
+      }
+    }
+
     const parts = data.candidates?.[0]?.content?.parts || [];
     const reply =
       parts

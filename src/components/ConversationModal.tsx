@@ -3,6 +3,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { CompanionProfile } from '@/types/companion';
 import { VoiceMacro, getMacroCategory, MacroCategory } from '@/lib/voiceMacros';
+import { TelemetryWidget } from '@/components/TelemetryWidget';
 import {
   PhoneOff,
   Mic,
@@ -132,6 +133,9 @@ export const ConversationModal: React.FC<ConversationModalProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Télémétrie Live Tokens & Coût Réel */}
+          <TelemetryWidget className="shrink-0" />
+
           {/* Bouton / Onglet Commandes Vaisseau */}
           {enabledMacros.length > 0 && (
             <button

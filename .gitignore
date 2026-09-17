@@ -18,3 +18,10 @@ yarn-error.log*
 # OS
 .DS_Store
 *.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/

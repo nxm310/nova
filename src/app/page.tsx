@@ -14,6 +14,7 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { ConversationModal, LiveCallState } from '@/components/ConversationModal';
+import { TelemetryWidget } from '@/components/TelemetryWidget';
 import { visionManager } from '@/lib/vision';
 import { macroManager, VoiceMacro, getMacroCategory } from '@/lib/voiceMacros';
 import { geminiClient } from '@/lib/geminiClient';
@@ -1073,6 +1074,9 @@ export default function CompanionApp() {
 
         {/* Section DROITE : Utilitaires & Configuration (hauteur uniforme h-9) */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Télémétrie Live Tokens & Coût Réel */}
+          <TelemetryWidget />
+
           {/* Bascule lecture auto voix */}
           <button
             type="button"

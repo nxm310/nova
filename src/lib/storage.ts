@@ -8,6 +8,7 @@ const KEYS = {
   MESSAGES: 'ami_messages_v1',
   MEMORIES: 'ami_memories_v1',
   KEYBOARD_LAYOUT: 'sc_keyboard_layout',
+  TELEMETRY: 'ami_telemetry_v1',
 };
 
 export interface FullNovaConfig {
@@ -211,5 +212,36 @@ export const storage = {
       }
     }
     return { synced: false };
+  },
+
+  getTelemetry(): { promptTokens: number; candidateTokens: number; totalTokens: number } {
+    if (typeof window === 'undefined') return { promptTokens: 0, candidateTokens: 0, totalTokens: 0 };
+    try {
+      const data = localStorage.getItem(KEYS.TELEMETRY);
+      return data ? JSON.parse(data) : { promptTokens: 0, candidateTokens: 0, totalTokens: 0 };
+    } catch {
+      return { promptTokens: 0, candidateTokens: 0, totalTokens: 0 };
+    }
+  },
+
+  addTokens(prompt: number, candidate: number): { promptTokens: number; candidateTokens: number; totalTokens: number } {
+    const current = this.getTelemetry();
+    const updated = {
+      promptTokens: current.promptTokens + prompt,
+      candidateTokens: current.candidateTokens + candidate,
+      totalTokens: current.totalTokens + prompt + candidate,
+    };
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(KEYS.TELEMETRY, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('ami_tokens_updated', { detail: updated }));
+    }
+    return updated;
+  },
+
+  resetTelemetry(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(KEYS.TELEMETRY);
+      window.dispatchEvent(new CustomEvent('ami_tokens_updated', { detail: { promptTokens: 0, candidateTokens: 0, totalTokens: 0 } }));
+    }
   },
 };
