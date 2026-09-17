@@ -78,18 +78,24 @@ export const audioManager = {
     }
   },
 
-  // --- Lecture Audio HTML5 avec processeur d'effets Sci-Fi ---
   playAudioStream(
     src: string,
     onStart?: () => void,
     onEnd?: () => void,
     onError?: (err: any) => void,
-    options?: { robotEffect?: boolean }
+    options?: { robotEffect?: boolean; rate?: number }
   ): HTMLAudioElement {
     this.stopAll();
 
     const audio = new Audio(src);
     currentAudio = audio;
+
+    // Appliquer la vitesse de lecture dynamique (speechRate)
+    if (options?.rate) {
+      const clampedRate = Math.max(0.6, Math.min(2.5, options.rate));
+      audio.playbackRate = clampedRate;
+      audio.defaultPlaybackRate = clampedRate;
+    }
 
     // Appliquer le filtre robotique via Web Audio API si demandé
     if (options?.robotEffect && typeof window !== 'undefined') {

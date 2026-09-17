@@ -89,7 +89,7 @@ export const DEFAULT_PROFILE: CompanionProfile = {
   voiceProvider: 'webspeech',
   geminiVoice: 'Puck',
   edgeVoice: 'fr-FR-HenriNeural',
-  speechRate: 1.25,
+  speechRate: 1.35,
   autoPlayVoice: true,
   robotEffect: false,
   pitch: '+0Hz',

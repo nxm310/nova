@@ -1073,10 +1073,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {/* Boutons de vitesse rapide */}
                   <div className="flex gap-1.5 mt-2">
                     {[
-                      { label: 'Calme (1.0x)', val: 1.0 },
-                      { label: 'Fluide (1.25x)', val: 1.25 },
-                      { label: 'Rapide (1.4x)', val: 1.4 },
-                      { label: 'Express (1.6x)', val: 1.6 },
+                      { label: 'Posé (1.1x)', val: 1.1 },
+                      { label: 'Cockpit (1.35x)', val: 1.35 },
+                      { label: 'Rapide (1.5x)', val: 1.5 },
+                      { label: 'Express (1.75x)', val: 1.75 },
                     ].map((s) => (
                       <button
                         key={s.val}

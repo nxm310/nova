@@ -164,20 +164,28 @@ Commandes reconnues :
 
     const getModelCandidates = (quality?: string): string[] => {
       switch (quality) {
-        case '3.8-live':
-          return ['gemini-3.8-live', 'gemini-3.8-flash', 'gemini-2.5-flash'];
         case '3.8-flash':
-          return ['gemini-3.8-flash', 'gemini-2.5-flash'];
+          return ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
         case 'high':
-          return ['gemini-2.5-pro', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+          return ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3.8-flash'];
+        case '3.8-live':
         case 'fast':
         default:
-          return ['gemini-3.8-live', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+          return ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'];
       }
     };
 
     const candidateModels = getModelCandidates(profile.responseQuality);
-    const enableWebSearch = profile.webSearch !== false;
+
+    // Détection intelligente du besoin de recherche Google :
+    // Active la recherche uniquement si la demande concerne des infos web/actualités/liens externes,
+    // ce qui évite d'ajouter 2 à 3 secondes de latence inutile sur les commandes de vol Star Citizen.
+    const lastUserText = messages.slice().reverse().find((m) => m.role === 'user')?.content || '';
+    const needsSearch =
+      profile.webSearch !== false &&
+      /(https?:\/\/|recherche|google|actualit|nouvelle|prix|date de sortie|qui est|qu'est-ce que|qu'est ce que|c'est quoi|meteo|météo|version|derni[eè]re minute)/i.test(
+        lastUserText
+      );
 
     let lastError: any = null;
     let data: any = null;
@@ -195,6 +203,10 @@ Commandes reconnues :
           temperature: lengthSetting.temperature,
           topP: 0.95,
           maxOutputTokens: lengthSetting.maxTokens,
+          // Désactiver le délai de réflexion/thinking pour une réponse immédiate en vol
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
         },
       });
 
@@ -202,10 +214,10 @@ Commandes reconnues :
         let response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildPayload(enableWebSearch)),
+          body: JSON.stringify(buildPayload(needsSearch)),
         });
 
-        if (!response.ok && enableWebSearch) {
+        if (!response.ok && needsSearch) {
           console.warn(`[Gemini] Recherche Google non disponible pour ${model}, repli sans recherche...`);
           response = await fetch(url, {
             method: 'POST',

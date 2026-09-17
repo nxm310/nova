@@ -503,6 +503,7 @@ export default function CompanionApp() {
         const url = URL.createObjectURL(blob);
         audioManager.playAudioStream(url, onStart, onEnd, onError, {
           robotEffect: profile.robotEffect,
+          rate: profile.speechRate,
         });
       } catch (err) {
         console.warn('Fallback Edge vers Web Speech:', err);
@@ -522,6 +523,7 @@ export default function CompanionApp() {
         });
         audioManager.playAudioStream(audioUrl, onStart, onEnd, onError, {
           robotEffect: profile.robotEffect,
+          rate: profile.speechRate,
         });
       } catch (err) {
         console.warn('Fallback Gemini TTS vers Web Speech:', err);
@@ -565,7 +567,7 @@ export default function CompanionApp() {
       onError: (err) => {
         console.warn('Erreur appel vocal:', err);
       },
-      silenceMs: 1300,
+      silenceMs: 650,
     });
 
     if (!recognizer) {

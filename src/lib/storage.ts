@@ -30,7 +30,7 @@ export const storage = {
       if (!data) return DEFAULT_PROFILE;
       const parsed = JSON.parse(data);
       if (!parsed.speechRate || parsed.speechRate <= 1.0) {
-        parsed.speechRate = 1.25;
+        parsed.speechRate = 1.35;
         localStorage.setItem(KEYS.PROFILE, JSON.stringify({ ...DEFAULT_PROFILE, ...parsed }));
       }
       return { ...DEFAULT_PROFILE, ...parsed };
