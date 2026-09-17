@@ -425,21 +425,46 @@ export default function CompanionApp() {
     if (messageId) setPlayingMessageId(messageId);
 
     let hasEnded = false;
+    let watchdogTimer: NodeJS.Timeout | null = null;
+    let networkTimer: NodeJS.Timeout | null = null;
+
     const safeEnd = () => {
       if (hasEnded) return;
       hasEnded = true;
-      clearTimeout(watchdogTimer);
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      if (networkTimer) clearTimeout(networkTimer);
       setIsPlayingAudio(false);
       setPlayingMessageId(null);
       if (onComplete) onComplete();
     };
 
-    // Watchdog de sécurité : durée estimée + 2.5 secondes de marge
-    // Garantit que l'écoute du micro repart toujours même en arrière-plan
-    const estimatedMs = Math.max(3000, (cleanText.length / 8) * 1000 + 2500);
-    const watchdogTimer = setTimeout(() => {
-      safeEnd();
-    }, estimatedMs);
+    // Watchdog de lecture : armé UNIQUEMENT quand le flux audio commence à jouer en temps réel
+    // Garantit que les phrases ne sont jamais coupées en vol par un timer prématuré !
+    const armPlaybackWatchdog = () => {
+      if (networkTimer) {
+        clearTimeout(networkTimer);
+        networkTimer = null;
+      }
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      // Débit de lecture très sécurisé (~5 caractères/seconde) + 8 secondes de marge
+      const playDurationMs = Math.max(8000, (cleanText.length / 5) * 1000 + 8000);
+      watchdogTimer = setTimeout(() => {
+        safeEnd();
+      }, playDurationMs);
+    };
+
+    // Timeout de garde réseau : 14 secondes max pour charger le flux audio TTS
+    networkTimer = setTimeout(() => {
+      if (!hasEnded) {
+        console.warn('Timeout attente flux audio TTS');
+        safeEnd();
+      }
+    }, 14000);
+
+    const onStart = () => {
+      setIsPlayingAudio(true);
+      armPlaybackWatchdog();
+    };
 
     const onEnd = () => safeEnd();
     const onError = (e: any) => {
@@ -453,7 +478,7 @@ export default function CompanionApp() {
         voiceURI: profile.webSpeechVoiceURI,
         rate: profile.speechRate,
         pitch: profile.robotEffect ? 1.35 : 1.0,
-        onStart: () => setIsPlayingAudio(true),
+        onStart,
         onEnd,
         onError,
       });
@@ -476,12 +501,12 @@ export default function CompanionApp() {
         if (!res.ok) throw new Error('Erreur synthèse Edge');
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        audioManager.playAudioStream(url, undefined, onEnd, onError, {
+        audioManager.playAudioStream(url, onStart, onEnd, onError, {
           robotEffect: profile.robotEffect,
         });
       } catch (err) {
         console.warn('Fallback Edge vers Web Speech:', err);
-        audioManager.speakWebSpeech(cleanText, { rate: profile.speechRate, onEnd, onError });
+        audioManager.speakWebSpeech(cleanText, { rate: profile.speechRate, onStart, onEnd, onError });
       }
       return;
     }
@@ -495,12 +520,12 @@ export default function CompanionApp() {
           voice: profile.geminiVoice,
           apiKey,
         });
-        audioManager.playAudioStream(audioUrl, undefined, onEnd, onError, {
+        audioManager.playAudioStream(audioUrl, onStart, onEnd, onError, {
           robotEffect: profile.robotEffect,
         });
       } catch (err) {
         console.warn('Fallback Gemini TTS vers Web Speech:', err);
-        audioManager.speakWebSpeech(cleanText, { rate: profile.speechRate, onEnd, onError });
+        audioManager.speakWebSpeech(cleanText, { rate: profile.speechRate, onStart, onEnd, onError });
       }
     }
   };

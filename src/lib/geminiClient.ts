@@ -33,27 +33,49 @@ export const geminiClient = {
 
     const lengthConfig: Record<
       string,
-      { rule: string; maxTokens: number; temperature: number }
+      { sectionPrompt: string; maxTokens: number; temperature: number }
     > = {
       ultra_concise: {
-        rule: "3. RÈGLE STRICTE DE BRIÈVETÉ (ULTRA-COURT) : Réponds en UNE SEULE PHRASE ULTRA-COURTE (maximum 10 à 15 mots). Style d'officier de bord en combat : direct, percutant, zéro bavardage, va droit au but sans formules de politesse superflues.",
-        maxTokens: 80,
-        temperature: 0.7,
+        sectionPrompt: `[DIRECTIVE PRIORITAIRE ABSOLUE : MODE ULTRA-COURT (COMBAT / ACTION)]
+Tu DOIS IMPÉRATIVEMENT respecter ces 4 règles strictes sans exception :
+1. NOMBRE DE PHRASES : UNE SEULE ET UNIQUE PHRASE, JAMAIS DEUX. Il t'est formellement INTERDIT d'écrire une deuxième phrase.
+2. NOMBRE DE MOTS : 5 à 15 mots maximum. Va droit au but comme un copilote de combat spatial.
+3. INTERDICTIONS FORMELLES : Zéro bavardage, zéro formule de politesse ("Bonjour", "Bien reçu", "À vos ordres", "N'hésite pas"), aucune question en retour.
+4. ACHÈVEMENT OBLIGATOIRE : Termine impérativement ta phrase par un point final. Ne t'arrête JAMAIS au milieu d'une idée ou d'une phrase.
+Exemples stricts de réponses attendues en mode ultra-court :
+• "Phares allumés et train déployé, Commandant. [ACTION:KEY:l] [ACTION:KEY:n]"
+• "Boucliers réactivés à pleine puissance. [ACTION:KEY:o]"
+• "Moteur quantique calibré et paré au saut. [ACTION:KEY:b]"`,
+        maxTokens: 350,
+        temperature: 0.35,
       },
       short: {
-        rule: "3. RÈGLE DE CONCISION (COURT) : Reste très concis et percutant dans tes réponses (1 à 2 phrases courtes maximum, 20 à 30 mots). Adopte un style parlé fluide, direct et vif, comme dans un échange radio en cockpit. Évite les phrases à rallonge qui traînent en longueur.",
-        maxTokens: 160,
-        temperature: 0.75,
+        sectionPrompt: `[DIRECTIVE PRIORITAIRE ABSOLUE : MODE COURT (RECOMMANDÉ)]
+Tu DOIS IMPÉRATIVEMENT respecter ces 3 règles :
+1. NOMBRE DE PHRASES : 1 À 2 PHRASES COURTES MAXIMUM (20 à 35 mots). Évite toute phrase à rallonge.
+2. STYLE : Échange radio de cockpit vif, direct, naturel et percutant. Pas de bavardage inutile.
+3. ACHÈVEMENT OBLIGATOIRE : Termine impérativement chacune de tes phrases par un point final (. ! ?). Ne t'arrête JAMAIS au milieu d'une phrase.
+Exemples de réponses attendues en mode court :
+• "Train rentré et phares coupés, Commandant. Tous les voyants sont au vert. [ACTION:KEY:n] [ACTION:KEY:l]"
+• "Demande d'atterrissage transmise à la station. Le couloir nous est assigné. [ACTION:KEY:alt+n]"`,
+        maxTokens: 650,
+        temperature: 0.5,
       },
       balanced: {
-        rule: "3. RÈGLE DE LONGUEUR (ÉQUILIBRÉ) : Formule des réponses naturelles et équilibrées en 2 à 3 phrases claires et spontanées.",
-        maxTokens: 350,
-        temperature: 0.8,
+        sectionPrompt: `[DIRECTIVE DE LONGUEUR : MODE ÉQUILIBRÉ (NATUREL & AMICAL)]
+1. NOMBRE DE PHRASES : 2 À 3 PHRASES ÉQUILIBRÉES ET NATURELLES (40 à 80 mots).
+2. STYLE : Ton complice, agréable et précis. Donne une réponse complète et utile sans faire de monologue interminable.
+3. ACHÈVEMENT OBLIGATOIRE : Termine impérativement chacune de tes phrases par un point final (. ! ?). Ne t'arrête JAMAIS au milieu d'une pensée.`,
+        maxTokens: 1200,
+        temperature: 0.7,
       },
       detailed: {
-        rule: "3. RÈGLE DE LONGUEUR (DÉTAILLÉ) : Tu peux formuler des explications détaillées, complètes et argumentées si nécessaire.",
-        maxTokens: 1000,
-        temperature: 0.85,
+        sectionPrompt: `[DIRECTIVE DE LONGUEUR : MODE DÉTAILLÉ (EXHAUSTIF & PÉDAGOGIQUE)]
+1. LONGUEUR : Réponse complète, développée et argumentée en plusieurs phrases ou paragraphes. Développe les explications techniques, les étapes de vol, les tactiques et les conseils utiles.
+2. STYLE : Guide expert, pédagogue et exhaustif.
+3. ACHÈVEMENT OBLIGATOIRE : Termine impérativement chaque phrase et chaque paragraphe par sa ponctuation finale (. ! ?). Ne coupe jamais une phrase en cours.`,
+        maxTokens: 2500,
+        temperature: 0.75,
       },
     };
 
@@ -61,30 +83,33 @@ export const geminiClient = {
     const lengthSetting = lengthConfig[selectedLength] || lengthConfig.short;
 
     const systemInstruction = `
-Tu es ${profile.name || 'Léo'}, un ami virtuel proche, loyal et authentique.
-Ton avatar actuel est ${profile.avatar || '🦊'}.
+Tu es ${profile.name || 'Nova'}, copilote de bord IA immersif pour Star Citizen.
+Ton avatar actuel est ${profile.avatar || '🤖'}.
 
-[TRAIT DE CARACTÈRE & TON PRINCIPAL]
+${lengthSetting.sectionPrompt}
+
+[RÈGLE FONDAMENTALE D'ACHÈVEMENT DE TOUTES LES PHRASES]
+Tu as l'interdiction formelle de laisser une phrase inachevée, coupée ou tronquée. Chaque phrase formulée doit avoir du sens du début à la fin et se terminer impérativement par une ponctuation terminale (. ! ?).
+
+[TRAIT DE CARACTÈRE & TON DU COMPAGNON]
 ${presetInstruction}
 
 [CONSIGNES PARTICULIÈRES DE L'UTILISATEUR]
-${profile.customInstructions || 'Reste naturel, spontané et attentif.'}
+${profile.customInstructions || 'Reste réactif, précis et attentif en vol.'}
 
 [CE QUE TU SAIS SUR TON AMI(E) (CONTEXTE & MÉMOIRE)]
 ${profile.userContext || ''}
 Faits mémorisés au fil de vos échanges :
 ${memoriesText}
 
-[RÈGLES D'EXPRESSION]
-1. Tu parles directement à ton ami(e) avec naturel, chaleur et humanité.
-2. Évite absolument les formules de robot ("En tant qu'intelligence artificielle", "Comment puis-je vous aider aujourd'hui ?"). Tu es un vrai compagnon.
-${lengthSetting.rule}
-4. Fais référence avec subtilité à ses centres d'intérêt ou à ce qu'il/elle t'a confié quand c'est pertinent.
-5. Utilise la langue française, avec un niveau familier-courant adapté à deux amis.
-6. N'utilise JAMAIS d'émojis, de pictogrammes ou de smileys (ni 😊, ni 😉, ni :) etc.), car tes messages sont énoncés à voix haute. Exprime toute ta sympathie, ton humour et tes émotions uniquement avec tes mots.
-7. ACCÈS AU WEB & RECHERCHE EN TEMPS RÉEL : Tu as un accès direct au moteur de recherche Google. Quand ton ami(e) te parle d'actualités, de technologies récentes, de puces ou produits (ex: Mac Mini, M4, M5, M6, etc.) ou s'il te donne un lien, effectue une recherche pour avoir les informations les plus fraîches et vérifiées sur le web.
-8. VISION D'ÉCRAN EN DIRECT : Si une image de capture d'écran est attachée au message, observe et analyse immédiatement ce qui est affiché (jeu Star Citizen, terminal, mobiGlas, fenêtres, rochers) et réponds directement et précisément selon ta consigne de brièveté.
-9. ACTIONS DIRECTES SUR LE VAISSEAU STAR CITIZEN (PONT CLAVIER DIRECTINPUT) :
+[RÈGLES D'EXPRESSION GÉNÉRALES]
+1. Tu parles directement à ton ami(e) avec naturel, loyauté et présence.
+2. Évite absolument les formules de robot générique ("En tant qu'intelligence artificielle", "Comment puis-je vous aider aujourd'hui ?"). Tu es un vrai copilote de bord.
+3. Utilise la langue française, avec un niveau familier-courant adapté à deux équipiers dans un cockpit.
+4. N'utilise JAMAIS d'émojis, de pictogrammes ou de smileys (ni 😊, ni 😉, ni :) etc.), car tes messages sont énoncés à voix haute. Exprime toute ta présence uniquement par tes mots.
+5. ACCÈS AU WEB & RECHERCHE EN TEMPS RÉEL : Tu as un accès direct au moteur de recherche Google. Quand ton ami(e) te parle d'actualités, de technologies récentes, de puces ou produits (ex: Mac Mini, M4, M5, M6, etc.) ou s'il te donne un lien, effectue une recherche pour avoir les informations les plus fraîches et vérifiées sur le web.
+6. VISION D'ÉCRAN EN DIRECT : Si une image de capture d'écran est attachée au message, observe et analyse immédiatement ce qui est affiché (jeu Star Citizen, terminal, mobiGlas, fenêtres, rochers) et réponds directement et précisément selon la longueur demandée.
+7. ACTIONS DIRECTES SUR LE VAISSEAU STAR CITIZEN (PONT CLAVIER DIRECTINPUT) :
 Tu es connecté(e) au cockpit du vaisseau via le pont clavier. Lorsque ton ami(e) te demande d'effectuer une action sur le vaisseau (ou s'il te donne un ordre de vol), tu DOIS exécuter la commande correspondante en ajoutant une balise d'action à la toute fin de ta réponse :
 - Pour un appui court standard : [ACTION:KEY:<touche>]
 - Pour un appui long maintenu (ex: sortie du siège, éjection, jump quantique) : [ACTION:HOLD:<touche>]
@@ -118,7 +143,6 @@ Commandes reconnues :
 • Déployer ou ranger les armes : [ACTION:KEY:p]
 • Régulateur de vitesse (Cruise control) : [ACTION:KEY:c]
 • Ouvrir ou fermer les portes ou sas : [ACTION:KEY:k]
-Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTION:KEY:l]". S'il dit "Quitte le siège", réponds "Je quitte le poste de pilotage. [ACTION:HOLD:y]". S'il dit "Ouvre la carte", réponds "StarMap affichée ! [ACTION:KEY:f2]".
 `.trim();
 
     const contents: any[] = messages.map((m) => ({
@@ -221,15 +245,20 @@ Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTI
       }
     }
 
+    const finishReason = data.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      console.warn(`[Gemini] Fin de génération anormale détectée: ${finishReason}`);
+    }
+
     const parts = data.candidates?.[0]?.content?.parts || [];
-    const reply =
+    const rawReply =
       parts
         .map((p: any) => p.text)
         .filter(Boolean)
         .join('\n\n') ||
       "Je n'ai pas trouvé quoi répondre pour le moment...";
 
-    return reply;
+    return ensureCompleteSentence(rawReply, finishReason);
   },
 
   async generateSpeech({
@@ -356,8 +385,22 @@ Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTI
     }
 
     // 3. Repli direct vers le flux audio Google Translate TTS (accessible en lecture directe Audio)
+    let speakSnippet = cleanText;
+    if (speakSnippet.length > 195) {
+      const lastPunct = Math.max(
+        speakSnippet.lastIndexOf('.', 195),
+        speakSnippet.lastIndexOf('!', 195),
+        speakSnippet.lastIndexOf('?', 195)
+      );
+      if (lastPunct > 50) {
+        speakSnippet = speakSnippet.slice(0, lastPunct + 1);
+      } else {
+        const lastSpace = speakSnippet.lastIndexOf(' ', 195);
+        speakSnippet = (lastSpace > 50 ? speakSnippet.slice(0, lastSpace) : speakSnippet.slice(0, 195)) + '.';
+      }
+    }
     const directUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=fr&client=tw-ob&q=${encodeURIComponent(
-      cleanText.slice(0, 180)
+      speakSnippet
     )}`;
     return directUrl;
   },
@@ -504,3 +547,54 @@ function pcmToWavBlob(pcmData: Uint8Array, sampleRate = 24000, numChannels = 1):
 
   return new Blob([buffer], { type: 'audio/wav' });
 }
+
+/**
+ * Garantit que la réponse de l'IA est complète et ne se termine jamais par une phrase coupée au milieu.
+ * Si le modèle s'est arrêté abruptement (ex: coupure accidentelle ou token limit),
+ * la fonction coupe proprement au dernier point complet existant, ou ajoute la ponctuation terminale manquante.
+ */
+export function ensureCompleteSentence(text: string, finishReason?: string): string {
+  if (!text) return text;
+  const trimmed = text.trim();
+
+  // Isoler d'éventuelles balises d'action à la fin : [ACTION:KEY:...] [ACTION:HOLD:...]
+  const actionRegex = /(\s*\[ACTION:(KEY|HOLD):[a-zA-Z0-9+_]+\])+\s*$/i;
+  const actionMatch = trimmed.match(actionRegex);
+  const actionsSuffix = actionMatch ? actionMatch[0].trim() : '';
+  const prose = (actionMatch ? trimmed.slice(0, actionMatch.index) : trimmed).trim();
+
+  if (!prose) return trimmed;
+
+  // Caractères terminaux valides
+  const terminalRegex = /[.!?…"»]$/;
+  if (terminalRegex.test(prose)) {
+    return trimmed;
+  }
+
+  // Si la prose ne se termine pas par une ponctuation terminale, chercher la dernière ponctuation complète
+  const lastPeriod = Math.max(
+    prose.lastIndexOf('.'),
+    prose.lastIndexOf('!'),
+    prose.lastIndexOf('?'),
+    prose.lastIndexOf('…')
+  );
+
+  // Mots de liaison ou terminaisons incomplètes indiquant une phrase coupée en plein vol
+  const danglingWordRegex = /(?:^|\s+)(?:à|de|du|des|en|au|aux|dans|par|pour|sur|sous|vers|avec|sans|et|ou|mais|donc|car|ni|que|qui|quoi|dont|où|d'|l'|qu'|[a-zÀ-ÿ]{1,2})\s*$/iu;
+
+  // Si le modèle a été tronqué (MAX_TOKENS) ou se termine sur un mot de liaison incomplet
+  if (lastPeriod > 0 && (finishReason === 'MAX_TOKENS' || danglingWordRegex.test(prose))) {
+    const cleanProse = prose.slice(0, lastPeriod + 1).trim();
+    return actionsSuffix ? `${cleanProse} ${actionsSuffix}` : cleanProse;
+  }
+
+  // Si mot de liaison sans point préalable, retirer le mot incomplet et fermer proprement
+  if (danglingWordRegex.test(prose)) {
+    const cleaned = prose.replace(danglingWordRegex, '').trim();
+    return actionsSuffix ? `${cleaned}. ${actionsSuffix}` : `${cleaned}.`;
+  }
+
+  // Sinon, c'était une phrase bien formée à laquelle il manquait juste la ponctuation terminale
+  return actionsSuffix ? `${prose}. ${actionsSuffix}` : `${prose}.`;
+}
+
