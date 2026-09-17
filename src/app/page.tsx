@@ -11,9 +11,7 @@ import { storage } from '@/lib/storage';
 import { audioManager } from '@/lib/audio';
 import { cleanTextForSpeech } from '@/lib/speechUtils';
 import { SettingsModal } from '@/components/SettingsModal';
-import { InstallModal } from '@/components/InstallModal';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
-import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { ConversationModal, LiveCallState } from '@/components/ConversationModal';
 import { TelemetryWidget } from '@/components/TelemetryWidget';
 import { visionManager } from '@/lib/vision';
@@ -100,36 +98,6 @@ export default function CompanionApp() {
     };
   } | null>(null);
   const [updateToast, setUpdateToast] = useState<string | null>(null);
-
-  // États pour l'Installation de l'Application (PWA & Raccourci Bureau)
-  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-
-  // Capture de l'événement PWA avant installation
-  useEffect(() => {
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-    };
-  }, []);
-
-  const handleTriggerInstall = async () => {
-    if (!installPrompt) return;
-    try {
-      installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setIsInstallModalOpen(false);
-      }
-      setInstallPrompt(null);
-    } catch (e) {
-      console.warn('Erreur lors du déclenchement PWA :', e);
-    }
-  };
 
   // États pour le Mode Appel Mains-Libres continu
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
@@ -1044,7 +1012,7 @@ export default function CompanionApp() {
             {/* Statut Pont PC Clavier */}
             <button
               type="button"
-              onClick={() => bridgeConnected === false ? setIsInstallModalOpen(true) : setIsSettingsOpen(true)}
+              onClick={() => setIsSettingsOpen(true)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono border transition shadow-sm ${
                 bridgeConnected === true
                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
@@ -1224,17 +1192,6 @@ export default function CompanionApp() {
               <span className="hidden md:inline">Mise à jour</span>
             </button>
 
-            {/* Touche Installer l'App PWA & Raccourci Bureau */}
-            <button
-              type="button"
-              onClick={() => setIsInstallModalOpen(true)}
-              className="h-10 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-200 text-xs font-semibold shadow-sm active:scale-95 transition flex items-center gap-1.5"
-              title="Installer Nova sur votre PC (PWA ou Raccourci Bureau) ou Tablette Cockpit"
-            >
-              <Download className={`w-3.5 h-3.5 text-emerald-300 shrink-0 ${installPrompt ? 'animate-bounce text-emerald-400' : ''}`} />
-              <span className="hidden md:inline">Installer l'App</span>
-            </button>
-
             {/* Bouton Paramètres */}
             <button
               type="button"
@@ -1247,42 +1204,6 @@ export default function CompanionApp() {
           </div>
         </div>
       </header>
-
-      {/* Bannière Alerte Déconnexion Pont PC (Python) */}
-      {bridgeConnected === false && (
-        <div className="bg-gradient-to-r from-rose-950/95 via-slate-900/95 to-rose-950/95 border-b border-rose-500/40 px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-200 backdrop-blur-md animate-fade-in z-30 shadow-lg shadow-rose-950/40">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-4 h-4 text-rose-400 animate-pulse" />
-            </div>
-            <div>
-              <p className="font-semibold text-white">
-                Pont PC Non Détecté (Python n'est pas lancé sur le port 5005)
-              </p>
-              <p className="text-[11px] text-rose-300/80">
-                L'envoi des commandes physiques dans Star Citizen nécessite que le script local soit actif.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <a
-              href="nova://start"
-              className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition shadow-md shadow-rose-600/30 flex items-center gap-1.5 active:scale-95"
-              title="Tente de lancer le pont PC automatiquement via le protocole nova://"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Démarrer le Pont PC</span>
-            </a>
-            <button
-              type="button"
-              onClick={() => setIsInstallModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition text-xs font-semibold active:scale-95"
-            >
-              Aide & Raccourci
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Toast de confirmation de sauvegarde */}
       {quickSaveToast && (
@@ -1885,18 +1806,6 @@ export default function CompanionApp() {
           </footer>
         </div>
       </div>
-
-      {/* Prompt d'installation PWA mobile */}
-      <PWAInstallPrompt />
-
-      {/* Modal d'Installation PWA & Raccourci Bureau */}
-      <InstallModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-        canInstallPrompt={!!installPrompt}
-        onTriggerInstall={handleTriggerInstall}
-        bridgeConnected={bridgeConnected}
-      />
 
       {/* Modal des Paramètres */}
       <SettingsModal

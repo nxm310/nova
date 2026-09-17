@@ -16,10 +16,8 @@ if %errorLevel% neq 0 (
 :: Revenir dans le dossier du script apres elevation
 cd /d "%~dp0"
 
-:: --- 🔗 ENREGISTREMENT DU PROTOCOLE URL nova:// (1-CLIC DEPUIS LE WEB/PWA) ---
-reg add "HKCU\Software\Classes\nova" /ve /d "URL:Nova Star Citizen Protocol" /f >nul 2>&1
-reg add "HKCU\Software\Classes\nova" /v "URL Protocol" /d "" /f >nul 2>&1
-reg add "HKCU\Software\Classes\nova\shell\open\command" /ve /d "\"cmd.exe\" /c \"\"%~f0\"\"" /f >nul 2>&1
+:: Nettoyage protocole
+reg delete "HKCU\Software\Classes\nova" /f >nul 2>&1
 
 cls
 echo ==================================================================
