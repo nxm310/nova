@@ -1044,7 +1044,7 @@ export default function CompanionApp() {
             {/* Statut Pont PC Clavier */}
             <button
               type="button"
-              onClick={() => setIsSettingsOpen(true)}
+              onClick={() => bridgeConnected === false ? setIsInstallModalOpen(true) : setIsSettingsOpen(true)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono border transition shadow-sm ${
                 bridgeConnected === true
                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
@@ -1247,6 +1247,42 @@ export default function CompanionApp() {
           </div>
         </div>
       </header>
+
+      {/* Bannière Alerte Déconnexion Pont PC (Python) */}
+      {bridgeConnected === false && (
+        <div className="bg-gradient-to-r from-rose-950/95 via-slate-900/95 to-rose-950/95 border-b border-rose-500/40 px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-200 backdrop-blur-md animate-fade-in z-30 shadow-lg shadow-rose-950/40">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4 h-4 text-rose-400 animate-pulse" />
+            </div>
+            <div>
+              <p className="font-semibold text-white">
+                Pont PC Non Détecté (Python n'est pas lancé sur le port 5005)
+              </p>
+              <p className="text-[11px] text-rose-300/80">
+                L'envoi des commandes physiques dans Star Citizen nécessite que le script local soit actif.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="nova://start"
+              className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition shadow-md shadow-rose-600/30 flex items-center gap-1.5 active:scale-95"
+              title="Tente de lancer le pont PC automatiquement via le protocole nova://"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Démarrer le Pont PC</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setIsInstallModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition text-xs font-semibold active:scale-95"
+            >
+              Aide & Raccourci
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Toast de confirmation de sauvegarde */}
       {quickSaveToast && (

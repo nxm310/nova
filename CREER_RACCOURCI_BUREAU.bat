@@ -7,8 +7,14 @@ echo ==================================================================
 echo       🚀 NOVA — CRÉATION DU RACCOURCI SUR LE BUREAU WINDOWS
 echo ==================================================================
 echo.
-echo Recherche des composants Nova dans ce dossier...
+echo Configuration du raccourci et du protocole 1-clic...
 
+:: 1. Enregistrement du protocole nova://
+reg add "HKCU\Software\Classes\nova" /ve /d "URL:Nova Star Citizen Protocol" /f >nul 2>&1
+reg add "HKCU\Software\Classes\nova" /v "URL Protocol" /d "" /f >nul 2>&1
+reg add "HKCU\Software\Classes\nova\shell\open\command" /ve /d "\"cmd.exe\" /c \"\"%~dp0DEMARRER_NOVA.bat\"\"" /f >nul 2>&1
+
+:: 2. Création du raccourci Bureau
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ws = New-Object -ComObject WScript.Shell; " ^
   "$desktop = [Environment]::GetFolderPath('Desktop'); " ^
@@ -18,7 +24,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$sc = $ws.CreateShortcut($scPath); " ^
   "$sc.TargetPath = $target; " ^
   "$sc.WorkingDirectory = $root; " ^
-  "$sc.Description = 'Nova — Compagnon Star Citizen'; " ^
+  "$sc.Description = 'Nova — Compagnon Star Citizen (Pont Clavier & Ordinateur de Bord)'; " ^
   "if (Test-Path (Join-Path $root 'public\favicon.ico')) { $sc.IconLocation = ((Join-Path $root 'public\favicon.ico') + ',0') } " ^
   "elseif (Test-Path (Join-Path $root 'out\favicon.ico')) { $sc.IconLocation = ((Join-Path $root 'out\favicon.ico') + ',0') } " ^
   "elseif (Test-Path (Join-Path $root 'favicon.ico')) { $sc.IconLocation = ((Join-Path $root 'favicon.ico') + ',0') }; " ^
@@ -32,7 +38,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
 
 echo.
 echo ==================================================================
-echo   Vous pouvez désormais lancer Nova directement depuis votre Bureau !
+echo   ✓ Double-cliquez sur l'icône 'Nova - Star Citizen' sur votre Bureau
+echo     pour lancer le pont Python ET l'application en même temps !
 echo ==================================================================
 echo.
 pause

@@ -9,10 +9,11 @@ import {
   Smartphone,
   X,
   ShieldCheck,
-  Terminal,
   Sparkles,
-  ExternalLink,
-  Laptop
+  Laptop,
+  Play,
+  AlertTriangle,
+  Power
 } from 'lucide-react';
 
 interface InstallModalProps {
@@ -37,13 +38,18 @@ export const InstallModal: React.FC<InstallModalProps> = ({
     message?: string;
   } | null>(null);
 
+  const [startupLoading, setStartupLoading] = useState(false);
+  const [startupStatus, setStartupStatus] = useState<{
+    success?: boolean;
+    message?: string;
+  } | null>(null);
+
   if (!isOpen) return null;
 
   const handleCreateDesktopShortcut = async () => {
     setShortcutLoading(true);
     setShortcutStatus(null);
     try {
-      // Tenter d'abord /api/desktop-shortcut puis /nova/api/desktop-shortcut
       let res = await fetch('/api/desktop-shortcut', { method: 'POST' }).catch(() => null);
       if (!res || !res.ok) {
         res = await fetch('/nova/api/desktop-shortcut', { method: 'POST' }).catch(() => null);
@@ -65,7 +71,7 @@ export const InstallModal: React.FC<InstallModalProps> = ({
       } else {
         setShortcutStatus({
           success: false,
-          message: 'Le pont PC Nova ne répond pas. Vérifiez que DEMARRER_NOVA.bat est lancé.',
+          message: 'Le pont PC ne répond pas. Lancez d\'abord DEMARRER_NOVA.bat ou utilisez le fichier CREER_RACCOURCI_BUREAU.bat dans le dossier de Nova.',
         });
       }
     } catch (err: any) {
@@ -75,6 +81,44 @@ export const InstallModal: React.FC<InstallModalProps> = ({
       });
     } finally {
       setShortcutLoading(false);
+    }
+  };
+
+  const handleToggleStartup = async (enable: boolean) => {
+    setStartupLoading(true);
+    setStartupStatus(null);
+    try {
+      let res = await fetch(`/api/startup-shortcut?enable=${enable}`, { method: 'POST' }).catch(() => null);
+      if (!res || !res.ok) {
+        res = await fetch(`/nova/api/startup-shortcut?enable=${enable}`, { method: 'POST' }).catch(() => null);
+      }
+
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setStartupStatus({
+            success: true,
+            message: data.message || (enable ? 'Démarrage automatique activé !' : 'Démarrage automatique désactivé.'),
+          });
+        } else {
+          setStartupStatus({
+            success: false,
+            message: data.error || 'Erreur lors de la configuration du démarrage.',
+          });
+        }
+      } else {
+        setStartupStatus({
+          success: false,
+          message: 'Le pont PC ne répond pas. Lancez d\'abord DEMARRER_NOVA.bat.',
+        });
+      }
+    } catch (err: any) {
+      setStartupStatus({
+        success: false,
+        message: err?.message || 'Erreur réseau.',
+      });
+    } finally {
+      setStartupLoading(false);
     }
   };
 
@@ -103,14 +147,14 @@ export const InstallModal: React.FC<InstallModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white tracking-wide">
-                  Installer l'Application Nova
+                  Installer & Lancer l'Application Nova
                 </h2>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                  PWA & Cockpit
+                  Cockpit Star Citizen
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Mode application autonome, raccourci bureau et configuration multi-écrans
+                Synchronisation du pont Python, raccourci bureau et configuration plein écran
               </p>
             </div>
           </div>
@@ -125,64 +169,45 @@ export const InstallModal: React.FC<InstallModalProps> = ({
 
         {/* Corps Scrollable */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-          {/* OPTION 1 : INSTALLATION PWA IMMÉDIATE (NAVIGATEUR) */}
-          <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-950/40 via-slate-900/60 to-indigo-950/40 border border-cyan-500/30 shadow-sm relative overflow-hidden">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1.5 flex-1">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  <h3 className="font-semibold text-sm text-cyan-200">
-                    Application Web Progressive (PWA)
-                  </h3>
+          {/* ALERTE PONT DÉCONNECTÉ SI APPLICABLE */}
+          {bridgeConnected === false && (
+            <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/50 flex items-start justify-between gap-3 shadow-sm">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-sm text-rose-200">
+                    Le pont Python (Port 5005) n'est pas lancé
+                  </p>
+                  <p className="text-rose-300 text-xs leading-relaxed">
+                    L'interface web tourne, mais le pont local est indispensable pour transmettre vos ordres vocaux directement dans Star Citizen (DirectInput).
+                  </p>
                 </div>
-                <p className="text-slate-300 text-xs leading-relaxed">
-                  Installez Nova comme une application de bureau native dans Chrome, Edge ou Brave.
-                  Elle apparaîtra dans votre menu Démarrer et votre barre des tâches sans barres d'onglets de navigateur.
-                </p>
               </div>
-
-              {canInstallPrompt ? (
-                <button
-                  type="button"
-                  onClick={onTriggerInstall}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold shadow-lg shadow-cyan-500/30 active:scale-95 transition shrink-0 flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4 animate-bounce" />
-                  <span>Installer</span>
-                </button>
-              ) : (
-                <div className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-[11px] shrink-0 flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Déjà installée ou via menu</span>
-                </div>
-              )}
+              <a
+                href="nova://start"
+                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shrink-0 flex items-center gap-1.5 shadow-md shadow-rose-600/30 active:scale-95 transition"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Démarrer le Pont</span>
+              </a>
             </div>
+          )}
 
-            {!canInstallPrompt && (
-              <div className="mt-3 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
-                <p className="font-medium text-slate-300">Comment installer manuellement si le bouton n'apparaît pas :</p>
-                <ul className="list-disc list-inside space-y-0.5 text-slate-400 pl-1">
-                  <li><strong className="text-cyan-300">Chrome :</strong> Cliquez sur l'icône <strong className="text-white">⊕</strong> dans la barre d'adresse (à droite) ou Menu (⋮) → <em>Installer Nova...</em></li>
-                  <li><strong className="text-cyan-300">Edge :</strong> Cliquez sur l'icône <strong className="text-white">⊕ App</strong> dans la barre d'adresse ou Menu (…) → <em>Applications</em> → <em>Installer Nova</em></li>
-                  <li><strong className="text-cyan-300">Brave :</strong> Cliquez sur l'icône d'installation à droite de l'URL.</li>
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* OPTION 2 : RACCOURCI BUREAU WINDOWS 1-CLIC */}
-          <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition">
+          {/* SECTION ESSENTIELLE : RACCOURCI BUREAU UNIFIÉ (PONT + APPLICATION) */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-slate-900/80 to-teal-950/40 border border-emerald-500/40 shadow-sm relative overflow-hidden">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center gap-2">
                   <Laptop className="w-4 h-4 text-emerald-400" />
-                  <h3 className="font-semibold text-sm text-white">
-                    Raccourci Bureau Windows (1-Clic)
+                  <h3 className="font-bold text-sm text-emerald-200">
+                    Raccourci Bureau Complet « Nova - Star Citizen »
                   </h3>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Recommandé
+                  </span>
                 </div>
-                <p className="text-slate-400 text-xs leading-relaxed">
-                  Crée une icône <strong className="text-white">« Nova - Star Citizen »</strong> directement sur votre Bureau Windows.
-                  Elle lance le pont de communication en <strong className="text-emerald-400">mode Administrateur</strong> pour que Star Citizen accepte les frappes clavier sans blocage.
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Crée une icône officielle sur votre Bureau Windows qui <strong>lance automatiquement le pont Python en Administrateur</strong> et <strong>ouvre immédiatement la fenêtre cockpit</strong>. C'est la méthode idéale pour lancer Nova en 1 double-clic !
                 </p>
               </div>
 
@@ -190,17 +215,17 @@ export const InstallModal: React.FC<InstallModalProps> = ({
                 type="button"
                 onClick={handleCreateDesktopShortcut}
                 disabled={shortcutLoading}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 font-semibold shadow-sm active:scale-95 transition shrink-0 flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold shadow-lg shadow-emerald-600/30 active:scale-95 transition shrink-0 flex items-center gap-2 disabled:opacity-50"
               >
                 {shortcutLoading ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Création...</span>
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Créer le Raccourci</span>
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                    <span>Créer le Raccourci Bureau</span>
                   </>
                 )}
               </button>
@@ -210,8 +235,8 @@ export const InstallModal: React.FC<InstallModalProps> = ({
               <div
                 className={`mt-3 p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
                   shortcutStatus.success
-                    ? 'bg-emerald-950/60 border-emerald-500 text-emerald-200'
-                    : 'bg-rose-950/60 border-rose-500 text-rose-200'
+                    ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200'
+                    : 'bg-rose-950/80 border-rose-500 text-rose-200'
                 }`}
               >
                 {shortcutStatus.success ? (
@@ -224,17 +249,102 @@ export const InstallModal: React.FC<InstallModalProps> = ({
             )}
           </div>
 
-          {/* OPTION 3 : FENÊTRE ÉCRAN VERTICAL (MODE APP SANS BARRES) */}
+          {/* DÉMARRAGE AUTOMATIQUE AU BOOT WINDOWS */}
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-2">
+                  <Power className="w-4 h-4 text-cyan-400" />
+                  <h3 className="font-semibold text-sm text-white">
+                    Lancer le pont avec Windows (Démarrage Automatique)
+                  </h3>
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Permet au pont Python de démarrer silencieusement en arrière-plan à chaque allumage de votre PC. Comme ça, Nova est toujours prêt à répondre dès que vous ouvrez l'appli ou lancez Star Citizen.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleToggleStartup(true)}
+                  disabled={startupLoading}
+                  className="px-3 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/35 border border-cyan-500/40 text-cyan-200 text-xs font-semibold active:scale-95 transition disabled:opacity-50"
+                >
+                  Activer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleStartup(false)}
+                  disabled={startupLoading}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white text-xs font-semibold active:scale-95 transition disabled:opacity-50"
+                >
+                  Désactiver
+                </button>
+              </div>
+            </div>
+
+            {startupStatus && (
+              <div
+                className={`mt-3 p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+                  startupStatus.success
+                    ? 'bg-cyan-950/80 border-cyan-500 text-cyan-200'
+                    : 'bg-rose-950/80 border-rose-500 text-rose-200'
+                }`}
+              >
+                {startupStatus.success ? (
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <X className="w-4 h-4 text-rose-400 shrink-0" />
+                )}
+                <span>{startupStatus.message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* APPLICATION PWA DU NAVIGATEUR */}
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  <h3 className="font-semibold text-sm text-cyan-200">
+                    Application Web Progressive (PWA Navigateur)
+                  </h3>
+                </div>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Si vous avez installé Nova via l'icône <strong>⊕</strong> de Chrome/Edge, pensez à lancer <strong>DEMARRER_NOVA.bat</strong> ou votre raccourci bureau pour que les touches physiques fonctionnent en jeu.
+                </p>
+              </div>
+
+              {canInstallPrompt ? (
+                <button
+                  type="button"
+                  onClick={onTriggerInstall}
+                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold shadow-md shadow-cyan-600/30 active:scale-95 transition shrink-0 flex items-center gap-1.5"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Installer PWA</span>
+                </button>
+              ) : (
+                <div className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-[11px] shrink-0 flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Prise en charge active</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* FENÊTRE DÉDIÉE SANS BARRES DE NAVIGATION (ÉCRAN VERTICAL) */}
           <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition">
             <div className="flex items-center gap-2 mb-2">
               <Monitor className="w-4 h-4 text-indigo-400" />
               <h3 className="font-semibold text-sm text-white">
-                Fenêtre Autonome Plein Écran (Écran Vertical PC)
+                Fenêtre Plein Écran Dédiée (Écran Vertical PC)
               </h3>
             </div>
             <p className="text-slate-400 text-xs leading-relaxed mb-3">
-              Si vous placez Nova sur un écran secondaire vertical à côté de votre écran Star Citizen,
-              lancez-le en mode fenêtre dédiée sans barre d'adresse ni onglets parasites :
+              Pour afficher Nova sans onglets ni barre d'adresse sur votre écran vertical secondaire :
             </p>
 
             <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-cyan-300">
@@ -259,7 +369,7 @@ export const InstallModal: React.FC<InstallModalProps> = ({
             </div>
           </div>
 
-          {/* OPTION 4 : TABLETTE / IPAD EN TOUCH DECK COCKPIT */}
+          {/* TABLETTE / IPAD EN TOUCH DECK COCKPIT */}
           <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition">
             <div className="flex items-center gap-2 mb-2">
               <Smartphone className="w-4 h-4 text-purple-400" />
@@ -272,19 +382,19 @@ export const InstallModal: React.FC<InstallModalProps> = ({
             </p>
             <ol className="list-decimal list-inside space-y-1.5 text-slate-300 pl-1 text-[11px]">
               <li>
-                Connectez la tablette au même réseau Wi-Fi que votre PC.
+                Connectez la tablette au même réseau Wi-Fi que votre PC de jeu.
               </li>
               <li>
-                Ouvrez Safari (iPad/iPhone) ou Chrome (Android) et tapez l'adresse IP locale de votre PC :{' '}
-                <span className="font-mono text-cyan-300 bg-slate-950 px-1.5 py-0.5 rounded">http://&lt;IP_DE_VOTRE_PC&gt;:5005/nova/</span>
+                Ouvrez Safari (iPad) ou Chrome (Android) et saisissez l'adresse de votre PC :{' '}
+                <span className="font-mono text-cyan-300 bg-slate-950 px-1.5 py-0.5 rounded">http://&lt;IP_DU_PC&gt;:5005/nova/</span>
               </li>
               <li>
-                <strong className="text-purple-300">Sur iPad / iOS :</strong> Touchez le bouton Partager ⎋ puis choisissez{' '}
+                <strong className="text-purple-300">Sur iPad / iOS :</strong> Touchez Partager ⎋ puis{' '}
                 <strong className="text-white">« Sur l'écran d'accueil »</strong>.
               </li>
               <li>
                 <strong className="text-purple-300">Sur Android :</strong> Touchez le menu (⋮) puis{' '}
-                <strong className="text-white">« Ajouter à l'écran d'accueil »</strong> ou <strong className="text-white">« Installer l'application »</strong>.
+                <strong className="text-white">« Ajouter à l'écran d'accueil »</strong>.
               </li>
             </ol>
           </div>
@@ -299,7 +409,7 @@ export const InstallModal: React.FC<InstallModalProps> = ({
               }`}
             />
             <span>
-              {bridgeConnected === true ? 'Pont PC connecté (Port 5005)' : 'Pont PC non détecté'}
+              {bridgeConnected === true ? 'Pont PC connecté (Port 5005)' : 'Pont PC déconnecté (Lancez DEMARRER_NOVA.bat)'}
             </span>
           </div>
 

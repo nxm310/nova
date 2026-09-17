@@ -35,7 +35,7 @@ except Exception:
     pass
 
 PORT = 5005
-CURRENT_VERSION = "1.3.5"
+CURRENT_VERSION = "1.3.6"
 
 def find_root_dir() -> str:
     """Détermine le dossier racine de l'application Nova (dossier contenant Nova-StarCitizen.exe, DEMARRER_NOVA.bat ou package.json)."""
@@ -849,6 +849,7 @@ $sc.Description = "Nova — Compagnon Star Citizen"
             timeout=10
         )
         if res.returncode == 0 and os.path.exists(shortcut_path):
+            register_windows_protocol()
             return {
                 "success": True,
                 "shortcutPath": shortcut_path,
@@ -860,6 +861,95 @@ $sc.Description = "Nova — Compagnon Star Citizen"
                 "success": False,
                 "error": f"Erreur PowerShell ({res.returncode}): {res.stderr.strip() or res.stdout.strip()}"
             }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def register_windows_protocol() -> bool:
+    """Enregistre le protocole URL 'nova://' pour lancement 1-clic direct depuis le navigateur/PWA."""
+    if not is_windows and sys.platform != 'win32':
+        return False
+    try:
+        import winreg
+        root_dir = find_root_dir()
+        bat_target = os.path.join(root_dir, "DEMARRER_NOVA.bat")
+        exe_target = os.path.join(root_dir, "Nova-StarCitizen.exe")
+        target = exe_target if os.path.exists(exe_target) else bat_target
+
+        key_path = r"Software\Classes\nova"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "URL:Nova Star Citizen Protocol")
+            winreg.SetValueEx(key, "URL Protocol", 0, winreg.REG_SZ, "")
+
+        cmd_path = rf"{key_path}\shell\open\command"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_path) as key:
+            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, f'cmd.exe /c "{target}"')
+        return True
+    except Exception:
+        return False
+
+def manage_windows_startup_shortcut(enable: bool = True) -> dict:
+    """Active ou désactive le lancement du pont Nova au démarrage de Windows."""
+    if not is_windows and sys.platform != 'win32':
+        return {"success": False, "error": "Cette fonctionnalité est réservée aux systèmes Windows."}
+
+    startup_dir = os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup")
+    shortcut_path = os.path.join(startup_dir, "Nova - Star Citizen.lnk")
+
+    if not enable:
+        if os.path.exists(shortcut_path):
+            try:
+                os.remove(shortcut_path)
+                return {"success": True, "enabled": False, "message": "Lancement au démarrage désactivé avec succès."}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return {"success": True, "enabled": False, "message": "Démarrage déjà désactivé."}
+
+    root_dir = find_root_dir()
+    bat_target = os.path.join(root_dir, "DEMARRER_NOVA.bat")
+    exe_target = os.path.join(root_dir, "Nova-StarCitizen.exe")
+    target_path = exe_target if os.path.exists(exe_target) else bat_target
+
+    icon_path = ""
+    for candidate in [
+        os.path.join(root_dir, "public", "favicon.ico"),
+        os.path.join(OUT_DIR, "favicon.ico"),
+        os.path.join(root_dir, "favicon.ico"),
+    ]:
+        if os.path.exists(candidate):
+            icon_path = os.path.abspath(candidate)
+            break
+
+    shortcut_path_escaped = shortcut_path.replace('"', '`"')
+    target_path_escaped = target_path.replace('"', '`"')
+    root_dir_escaped = root_dir.replace('"', '`"')
+    icon_path_escaped = icon_path.replace('"', '`"') if icon_path else ""
+
+    ps_script = f'''
+$ws = New-Object -ComObject WScript.Shell
+$sc = $ws.CreateShortcut("{shortcut_path_escaped}")
+$sc.TargetPath = "{target_path_escaped}"
+$sc.WorkingDirectory = "{root_dir_escaped}"
+$sc.Description = "Nova — Démarrage Automatique Cockpit"
+'''
+    if icon_path_escaped:
+        ps_script += f'$sc.IconLocation = "{icon_path_escaped},0"\n'
+    ps_script += '$sc.Save()\n'
+
+    try:
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if res.returncode == 0 and os.path.exists(shortcut_path):
+            return {
+                "success": True,
+                "enabled": True,
+                "message": "Nova démarrera désormais automatiquement avec Windows !"
+            }
+        else:
+            return {"success": False, "error": f"Erreur PowerShell: {res.stderr.strip()}"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -927,6 +1017,7 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
                 "isAdmin": is_admin_windows(),
                 "configPath": get_persistent_config_path(),
                 "platform": sys.platform,
+                "isStartupEnabled": os.path.exists(os.path.join(os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"), "Nova - Star Citizen.lnk")) if (is_windows or sys.platform == 'win32') else False,
             }
             self.wfile.write(json.dumps(info).encode("utf-8"))
             return
@@ -981,6 +1072,19 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             self._send_cors()
             self.end_headers()
             res = create_windows_desktop_shortcut()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+
+        if clean in ('/api/startup-shortcut', '/nova/api/startup-shortcut'):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            enable_str = params.get('enable', ['true'])[0].lower()
+            enable = enable_str not in ('false', '0', 'no')
+            res = manage_windows_startup_shortcut(enable)
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
@@ -1135,6 +1239,19 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
+        if clean in ('/api/startup-shortcut', '/nova/api/startup-shortcut'):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors()
+            self.end_headers()
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            enable_str = params.get('enable', ['true'])[0].lower()
+            enable = enable_str not in ('false', '0', 'no')
+            res = manage_windows_startup_shortcut(enable)
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+
         self.send_response(400)
         self._send_cors()
         self.end_headers()
@@ -1146,6 +1263,17 @@ class UnifiedCompanionHandler(SimpleHTTPRequestHandler):
 def open_browser():
     time.sleep(1.2)
     url = f"http://localhost:{PORT}/nova/"
+    if is_windows:
+        # Tenter d'ouvrir directement dans une fenêtre dédiée PWA sans barres de navigation
+        for browser in ["chrome.exe", "msedge.exe", "brave.exe"]:
+            try:
+                cmd = f'start "" {browser} --app={url}'
+                if os.system(cmd) == 0:
+                    print(f"  ✓ Application ouverte en mode fenêtre cockpit ({browser})")
+                    return
+            except Exception:
+                continue
+
     try:
         webbrowser.open(url)
     except Exception:
@@ -1153,6 +1281,7 @@ def open_browser():
 
 
 def run():
+    register_windows_protocol()
     admin_ok = is_admin_windows()
     cfg = load_persistent_config()
     layout = cfg.get("keyboardLayout", "azerty") if isinstance(cfg, dict) else "azerty"
