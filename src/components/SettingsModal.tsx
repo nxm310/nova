@@ -786,29 +786,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </label>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-purple-950 text-purple-300 border border-purple-500/30">
-                    {formData.responseQuality === 'high' ? 'Gemini 2.5 Pro' : 'Gemini 2.5 Flash'}
+                    {formData.responseQuality === '3.8-live'
+                      ? 'Gemini 3.8 LIVE'
+                      : formData.responseQuality === '3.8-flash'
+                      ? 'Gemini 3.8 Flash'
+                      : formData.responseQuality === 'high'
+                      ? 'Gemini 2.5 Pro'
+                      : 'Gemini 2.5 Flash'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Choisissez entre vitesse d&apos;exécution instantanée pour vos manœuvres ou profondeur d&apos;analyse.
+                  Choisissez le modèle d&apos;intelligence artificielle adapté à votre utilisation (vocal temps réel, réactivité cockpit ou raisonnement approfondi).
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {[
                     {
-                      id: 'fast' as const,
-                      title: '🚀 Gemini 2.5 Flash (Ultra-rapide)',
-                      desc: 'Latence minimale (<1s). Recommandé pour Star Citizen, les ordres vocaux en direct et les réflexes en vol.',
-                      badge: 'Recommandé en vol',
+                      id: '3.8-live' as const,
+                      title: '✨ Gemini 3.8 LIVE (Vocal & Temps Réel)',
+                      desc: 'Nouveau modèle audio natif ultra-rapide (<0.5s). Conçu spécifiquement pour le dialogue vocal direct et les ordres Star Citizen.',
+                      badge: 'Nouveau 2026 — Recommandé',
+                    },
+                    {
+                      id: '3.8-flash' as const,
+                      title: '⚡ Gemini 3.8 Flash (Vitesse & Raisonnement)',
+                      desc: 'Le nouveau modèle de référence 3.8. Vitesse de réponse fulgurante et logique tactique renforcée.',
+                      badge: 'Nouveau 3.8',
                     },
                     {
                       id: 'high' as const,
-                      title: '🧠 Gemini 2.5 Pro (Haute précision)',
+                      title: '🧠 Gemini 2.5 Pro (Haute réflexion)',
                       desc: 'Raisonnement approfondi, analyse poussée des questions complexes et formulations très riches.',
-                      badge: 'Haute réflexion',
+                      badge: 'Haute précision',
+                    },
+                    {
+                      id: 'fast' as const,
+                      title: '🚀 Gemini 2.5 Flash (Classique)',
+                      desc: 'Version antérieure de secours.',
+                      badge: 'Classique',
                     },
                   ].map((opt) => {
-                    const isSelected = (formData.responseQuality || 'fast') === opt.id;
+                    const isSelected = (formData.responseQuality || '3.8-live') === opt.id;
                     return (
                       <button
                         key={opt.id}
@@ -943,13 +961,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-sm">Google / Gemini</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-sm">Google / Gemini</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30">
+                          ✨ 3.8 LIVE
+                        </span>
+                      </div>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium">
                         Natif
                       </span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Voix Google Studio & Gemini 2.0 (Puck, Aoede...). Expressivité naturelle et diction fluide.
+                      Moteur vocal officiel Google Gemini 3.8 LIVE & Studio (Aoede, Puck, Kore...). Diction ultra-fluide et réactivité instantanée.
                     </p>
                   </div>
 

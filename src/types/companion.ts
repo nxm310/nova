@@ -17,7 +17,7 @@ export interface PersonalityPreset {
 }
 
 export type ResponseLength = 'ultra_concise' | 'short' | 'balanced' | 'detailed';
-export type ResponseQuality = 'fast' | 'high';
+export type ResponseQuality = '3.8-live' | '3.8-flash' | 'high' | 'fast';
 
 export interface CompanionProfile {
   name: string;
@@ -35,7 +35,7 @@ export interface CompanionProfile {
   pitch?: string; // ex: '+0Hz', '+15Hz', '+25Hz'
   webSearch?: boolean; // Recherche Google en temps réel (Grounding)
   responseLength?: ResponseLength; // Longueur des réponses ('ultra_concise' | 'short' | 'balanced' | 'detailed')
-  responseQuality?: ResponseQuality; // Qualité / Modèle IA ('fast' = Flash rapide | 'high' = Pro haute précision)
+  responseQuality?: ResponseQuality; // Qualité / Modèle IA ('3.8-live' = Gemini 3.8 LIVE vocal | '3.8-flash' = 3.8 Flash | 'high' = Pro | 'fast' = Flash classique)
 }
 
 export interface MemoryItem {

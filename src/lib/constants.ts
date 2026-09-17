@@ -98,5 +98,5 @@ export const DEFAULT_PROFILE: CompanionProfile = {
   pitch: '+0Hz',
   webSearch: true,
   responseLength: 'short', // Réponses courtes (1 à 2 phrases max) par défaut
-  responseQuality: 'fast', // Gemini 2.5 Flash ultra-rapide par défaut
+  responseQuality: '3.8-live', // Gemini 3.8 LIVE ultra-rapide par défaut (Nouveau 2026)
 };

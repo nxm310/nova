@@ -137,47 +137,78 @@ Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTI
       }
     }
 
-    const model = profile.responseQuality === 'high' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const getModelCandidates = (quality?: string): string[] => {
+      switch (quality) {
+        case '3.8-live':
+          return ['gemini-3.8-live', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+        case '3.8-flash':
+          return ['gemini-3.8-flash', 'gemini-2.5-flash'];
+        case 'high':
+          return ['gemini-2.5-pro', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+        case 'fast':
+        default:
+          return ['gemini-3.8-live', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+      }
+    };
+
+    const candidateModels = getModelCandidates(profile.responseQuality);
     const enableWebSearch = profile.webSearch !== false;
 
-    const buildPayload = (withSearch: boolean) => ({
-      contents,
-      system_instruction: {
-        parts: [{ text: systemInstruction }],
-      },
-      ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
-      generationConfig: {
-        temperature: lengthSetting.temperature,
-        topP: 0.95,
-        maxOutputTokens: lengthSetting.maxTokens,
-      },
-    });
+    let lastError: any = null;
+    let data: any = null;
 
-    let response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload(enableWebSearch)),
-    });
+    for (const model of candidateModels) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 
-    if (!response.ok && enableWebSearch) {
-      console.warn('Grounding Google Search non disponible, repli sans recherche...');
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(false)),
+      const buildPayload = (withSearch: boolean) => ({
+        contents,
+        system_instruction: {
+          parts: [{ text: systemInstruction }],
+        },
+        ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
+        generationConfig: {
+          temperature: lengthSetting.temperature,
+          topP: 0.95,
+          maxOutputTokens: lengthSetting.maxTokens,
+        },
       });
+
+      try {
+        let response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildPayload(enableWebSearch)),
+        });
+
+        if (!response.ok && enableWebSearch) {
+          console.warn(`[Gemini] Recherche Google non disponible pour ${model}, repli sans recherche...`);
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(buildPayload(false)),
+          });
+        }
+
+        if (response.ok) {
+          data = await response.json();
+          break;
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          lastError = new Error(
+            errorData?.error?.message ||
+            `Erreur de l'API Gemini (${response.status}: ${response.statusText})`
+          );
+          console.warn(`[Gemini] Modèle ${model} indisponible (${response.status}), tentative repli suivant...`);
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Gemini] Échec tentative modèle ${model}:`, err?.message || err);
+      }
     }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData?.error?.message ||
-        `Erreur de l'API Gemini (${response.status}: ${response.statusText})`
-      );
+    if (!data) {
+      throw lastError || new Error("Impossible de joindre l'API Gemini après plusieurs tentatives.");
     }
-
-    const data = await response.json();
     const parts = data.candidates?.[0]?.content?.parts || [];
     const reply =
       parts
@@ -205,9 +236,14 @@ Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTI
 
     const key = (apiKey || '').trim();
 
-    // 1. Si une clé API est configurée, tenter l'endpoint Gemini Multimodal Audio (gemini-2.0-flash-exp)
+    // 1. Si une clé API est configurée, tenter l'endpoint Gemini Multimodal Audio (gemini-3.8-live, gemini-3.8-live-extended-thinking, gemini-3.8-flash, gemini-2.0-flash-exp)
     if (key) {
-      const candidateModels = ['gemini-2.0-flash-exp'];
+      const candidateModels = [
+        'gemini-3.8-live',
+        'gemini-3.8-live-extended-thinking',
+        'gemini-3.8-flash',
+        'gemini-2.0-flash-exp',
+      ];
 
       for (const model of candidateModels) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
@@ -312,6 +348,112 @@ Exemple simple : S'il dit "Allume les phares", réponds "Phares allumés ! [ACTI
       cleanText.slice(0, 180)
     )}`;
     return directUrl;
+  },
+
+  /**
+   * Initialise une session WebSocket bidirectionnelle temps réel avec Gemini 3.8 LIVE.
+   * Modèle : models/gemini-3.8-live (audio-to-audio natif à très faible latence).
+   */
+  createLiveWebSocketSession({
+    apiKey,
+    voice = 'Puck',
+    systemInstruction,
+    onAudioChunk,
+    onText,
+    onError,
+    onClose,
+  }: {
+    apiKey: string;
+    voice?: string;
+    systemInstruction?: string;
+    onAudioChunk?: (pcmBase64: string) => void;
+    onText?: (text: string) => void;
+    onError?: (err: any) => void;
+    onClose?: () => void;
+  }) {
+    const key = (apiKey || '').trim();
+    if (!key) {
+      throw new Error("Clé API manquante pour la session Gemini 3.8 LIVE.");
+    }
+
+    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${key}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      const setupMsg = {
+        setup: {
+          model: 'models/gemini-3.8-live',
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: voice || 'Puck',
+                },
+              },
+            },
+          },
+          ...(systemInstruction
+            ? {
+                systemInstruction: {
+                  parts: [{ text: systemInstruction }],
+                },
+              }
+            : {}),
+        },
+      };
+      ws.send(JSON.stringify(setupMsg));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const serverContent = data.serverContent;
+        if (serverContent?.modelTurn?.parts) {
+          for (const part of serverContent.modelTurn.parts) {
+            if (part.text && onText) {
+              onText(part.text);
+            }
+            const audioData = part.inlineData?.data || part.inline_data?.data;
+            if (audioData && onAudioChunk) {
+              onAudioChunk(audioData);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Gemini 3.8 LIVE] Erreur traitement paquet:', e);
+      }
+    };
+
+    ws.onerror = (e) => {
+      console.warn('[Gemini 3.8 LIVE] Erreur WebSocket:', e);
+      if (onError) onError(e);
+    };
+
+    ws.onclose = () => {
+      if (onClose) onClose();
+    };
+
+    return {
+      sendText: (text: string) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              clientContent: {
+                turns: [{ role: 'user', parts: [{ text }] }],
+                turnComplete: true,
+              },
+            })
+          );
+        }
+      },
+      close: () => {
+        try {
+          ws.close();
+        } catch {}
+      },
+      ws,
+    };
   },
 };
 
